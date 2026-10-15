@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Vélo">
+<title>Compteur Vélo</title>
+<style>
+  /* Fond noir pur, couleurs saturées et lumineuses pour rester lisibles en plein soleil */
+  :root{
+    --bg:#000000;
+    --speed:#4FC3FF;   /* bleu ciel vif */
+    --km:#39FF7A;      /* vert vif */
+    --time:#FFFFFF;
+    --cap:#FFB534;     /* ambre */
+    --ride:#FF6AD5;    /* rose vif : temps de roulage */
+    --dim:#9a9a9a;
+  }
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--time)}
+  body{
+    font-family:ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;
+    display:flex;flex-direction:column;align-items:center;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    box-sizing:border-box;overflow:hidden;
+    -webkit-user-select:none;user-select:none;touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  main{flex:1;width:100%;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center}
+  footer{padding:1.5vh 0 3vh}
+
+  /* Les chiffres sont dans la colonne centrale, donc centrés sur l'écran ; unités et cap sont à droite */
+  .row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:baseline;column-gap:2vw;width:100%;white-space:nowrap;line-height:1}
+  .num{grid-column:2;justify-self:center}
+  .side{grid-column:3;justify-self:start}
+
+  /* Chiffres à segments : les segments éteints restent visibles en filigrane, comme sur un cadran LCD */
+  .seg{display:block;fill:currentColor;overflow:visible}
+  .seg .off{opacity:.09}
+
+  #speed{height:min(29vw,18vh);color:var(--speed)}
+  /* "km/h" est un bouton : un appui bascule entre km/h et nœuds (kn) */
+  #u1{
+    align-self:center;
+    font:inherit;font-size:min(4.6vw,2.8vh);font-weight:700;line-height:1;color:var(--speed);
+    background:none;border:1.5px solid rgba(79,195,255,.45);border-radius:8px;
+    padding:.3em .55em;margin-left:.2em;cursor:pointer;
+  }
+  #u1:active{background:rgba(79,195,255,.2)}
+  #u1:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+  #km{height:min(14vw,9vh);color:var(--km)}
+  /* Bloc trip : distance + temps de roulage, rapprochés */
+  .trip,.clock{width:100%;display:flex;flex-direction:column;align-items:center;gap:1vh}
+  .clock{gap:5vh}
+  /* "trip" au-dessus de "km", en plus petit ; le bas de "km" s'aligne sur le bas des chiffres */
+  #u2{
+    display:flex;flex-direction:column;align-items:flex-start;gap:.3em;align-self:end;margin-bottom:-.2em;
+    font-size:min(4vw,2.5vh);font-weight:700;color:var(--km);line-height:1;
+  }
+  #u2 small{font-size:.55em;font-weight:700;letter-spacing:.08em}
+
+  #ride{height:min(5vw,3.2vh);color:var(--ride)}
+
+  #time{height:min(12vw,7.5vh);color:var(--time)}
+  /* Cap sous l'heure : lettres, ou petite boussole quand il n'y a pas de cap */
+  #head{
+    display:flex;align-items:center;justify-content:center;height:1em;
+    font-size:min(9vw,5.5vh);font-weight:800;line-height:1;color:var(--cap);
+  }
+
+  #reset{
+    font:inherit;font-size:min(3vw,1.9vh);font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    min-width:9em;padding:.65em 1.4em;border-radius:999px;
+    background:var(--km);color:#000;border:0;cursor:pointer;
+    transition:background .15s;
+  }
+  #reset.armed{background:var(--cap)}
+  #reset:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+  #status{
+    position:absolute;left:0;right:0;text-align:center;
+    top:calc(env(safe-area-inset-top) + 10px);
+    font-size:min(4vw,2.4vh);color:var(--dim);
+  }
+</style>
+</head>
+<body>
+  <div id="status" role="status">Recherche du GPS…</div>
+
+  <main>
+    <section class="row">
+      <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
+      <button id="u1" class="side" type="button" aria-label="Changer d'unité : km/h ou nœuds">km/h</button>
+    </section>
+
+    <div class="trip">
+      <section class="row">
+        <svg id="km" class="num seg" role="img" aria-label="Distance"></svg>
+        <span id="u2" class="side"><small>trip</small><span id="u2u">km</span></span>
+      </section>
+
+      <section class="row">
+        <svg id="ride" class="num seg" role="img" aria-label="Temps de roulage"></svg>
+      </section>
+    </div>
+
+    <div class="clock">
+      <section class="row">
+        <svg id="time" class="num seg" role="img" aria-label="Heure"></svg>
+      </section>
+
+      <section class="row">
+        <span id="head" class="num" role="img" aria-label="Cap"></span>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <button id="reset" type="button">Reset</button>
+  </footer>
+
+<script>
+(function(){
+  'use strict';
+
+  var MAX_ACC = 30;    // m : fixes moins précis que ça sont ignorés
+  var MIN_KMH = 2;     // km/h : en dessous, on considère l'arrêt (pas de cumul, cap masqué)
+  var KEY_M = 'compteur-velo-m';    // distance en mètres
+  var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
+  var KEY_U = 'compteur-velo-unit'; // unité choisie : 'km' (km/h) ou 'nm' (nœuds / milles nautiques)
+
+  var $ = function(id){ return document.getElementById(id); };
+  var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elTime = $('time'),
+      elHead = $('head'), elReset = $('reset'), elStatus = $('status'),
+      elU1 = $('u1'), elU2u = $('u2u');
+
+  /* ---------- Affichage à segments (7 segments) ---------- */
+  var S = 5, D = 1.5, W = 56, H = 100, ADV = 66, GAP = ADV - W, SKEW = 14;
+  function hseg(cy, x1, x2){
+    return [[x1+D,cy],[x1+D+S,cy-S],[x2-D-S,cy-S],[x2-D,cy],[x2-D-S,cy+S],[x1+D+S,cy+S]];
+  }
+  function vseg(cx, y1, y2){
+    return [[cx,y1+D],[cx+S,y1+D+S],[cx+S,y2-D-S],[cx,y2-D],[cx-S,y2-D-S],[cx-S,y1+D+S]];
+  }
+  var SHAPES = {
+    a: hseg(S, S, W-S), g: hseg(H/2, S, W-S), d: hseg(H-S, S, W-S),
+    f: vseg(S, S, H/2), b: vseg(W-S, S, H/2), e: vseg(S, H/2, H-S), c: vseg(W-S, H/2, H-S)
+  };
+  var ORDER = 'abcdefg';
+  var LIT = { '0':'abcdef','1':'bc','2':'abdeg','3':'abcdg','4':'bcfg','5':'acdfg',
+              '6':'acdefg','7':'abc','8':'abcdefg','9':'abcdfg','-':'g',' ':'' };
+
+  function pts(poly, ox){
+    return poly.map(function(p){ return (p[0] + ox) + ',' + p[1]; }).join(' ');
+  }
+  function build(text){
+    var x = 0, out = [], lastDigit = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text.charAt(i);
+      if (ch === ':') {
+        out.push('<rect x="' + (x+5) + '" y="25" width="10" height="10"/>' +
+                 '<rect x="' + (x+5) + '" y="65" width="10" height="10"/>');
+        x += 20; lastDigit = false;
+      } else if (ch === '.') {
+        out.push('<rect x="' + (x+4) + '" y="90" width="10" height="10"/>');
+        x += 18; lastDigit = false;
+      } else {
+        var on = LIT[ch] || '';
+        for (var k = 0; k < ORDER.length; k++) {
+          var s = ORDER.charAt(k);
+          out.push('<polygon class="' + (on.indexOf(s) >= 0 ? 'on' : 'off') +
+                   '" points="' + pts(SHAPES[s], x) + '"/>');
+        }
+        x += ADV; lastDigit = true;
+      }
+    }
+    if (lastDigit) x -= GAP;
+    return { w: x + SKEW,
+             html: '<g transform="translate(' + SKEW + ',0) skewX(-8)">' + out.join('') + '</g>' };
+  }
+  function setSeg(el, text){
+    if (el._t === text) return;
+    el._t = text;
+    var r = build(text);
+    el.setAttribute('viewBox', '0 0 ' + r.w + ' ' + H);
+    el.style.aspectRatio = r.w + ' / ' + H;
+    el.innerHTML = r.html;
+    el.setAttribute('aria-label', text.replace(/^\s+/, ''));
+  }
+
+  /* ---------- Formats ---------- */
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function fmtSpeed(kmh){ return kmh.toFixed(1); }
+  function fmtKm(m){ return (m / (unit === 'nm' ? 1852 : 1000)).toFixed(2); }
+  function fmtRide(ms){
+    var s = Math.floor(ms / 1000);
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h + ':' + pad2(m) + ':' + pad2(s % 60);
+  }
+
+  /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
+  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km';
+  try {
+    var sm = parseFloat(localStorage.getItem(KEY_M));
+    if (isFinite(sm) && sm >= 0) odo = sm;
+    var st = parseFloat(localStorage.getItem(KEY_T));
+    if (isFinite(st) && st >= 0) rideMs = st;
+    if (localStorage.getItem(KEY_U) === 'nm') unit = 'nm';
+  } catch(e){}
+  function saveState(){
+    try {
+      localStorage.setItem(KEY_M, String(odo));
+      localStorage.setItem(KEY_T, String(rideMs));
+    } catch(e){}
+  }
+  function showKm(){ setSeg(elKm, fmtKm(odo)); }
+  function showRide(){ setSeg(elRide, fmtRide(rideMs)); }
+  // Vitesse : mesurée en km/h en interne, convertie en nœuds à l'affichage (1 kn = 1,852 km/h)
+  function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh)); }
+  function applyUnit(){
+    elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
+    elU2u.textContent = unit === 'nm' ? 'miles' : 'km';
+    showSpeed();
+    showKm();
+  }
+  elU1.addEventListener('click', function(){
+    unit = unit === 'nm' ? 'km' : 'nm';
+    try { localStorage.setItem(KEY_U, unit); } catch(e){}
+    applyUnit();
+  });
+  showRide();
+  applyUnit();
+
+  /* ---------- Reset en deux appuis (évite le reset accidentel) ---------- */
+  var armed = false, armTimer = null;
+  function disarm(){
+    armed = false; clearTimeout(armTimer);
+    elReset.textContent = 'Reset'; elReset.classList.remove('armed');
+  }
+  elReset.addEventListener('click', function(){
+    if (!armed) {
+      armed = true;
+      elReset.textContent = 'Confirmer';
+      elReset.classList.add('armed');
+      armTimer = setTimeout(disarm, 3000);
+    } else {
+      odo = 0; rideMs = 0; saveState(); showKm(); showRide(); disarm();
+    }
+  });
+
+  /* ---------- Heure hh:mm (24 h) ---------- */
+  var lastT = '';
+  var lastFix = 0;
+  function tick(){
+    var d = new Date();
+    var t = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if (t !== lastT) { setSeg(elTime, t); lastT = t; }
+    if (lastFix && Date.now() - lastFix > 8000) {
+      lastKmh = 0; showSpeed();
+      setHead('');
+      setStatus('Signal GPS faible');
+    }
+  }
+  setInterval(tick, 1000);
+  tick();
+
+  function setStatus(msg){
+    if (msg) { elStatus.textContent = msg; elStatus.hidden = false; }
+    else { elStatus.hidden = true; }
+  }
+
+  /* ---------- Cap ---------- */
+  var DIRS = ['N','NE','E','SE','S','SW','W','NW'];
+  function dirOf(deg){ return DIRS[Math.round(deg / 45) % 8]; }
+  // Boussole discrète, affichée tant qu'il n'y a pas de cap
+  var ARROW = '<svg viewBox="0 0 24 24" style="height:.95em;width:.95em;opacity:.7" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
+              '<circle cx="12" cy="12" r="10"/>' +
+              '<path d="M12 5 L15.5 12.5 H8.5 Z" fill="currentColor" stroke="none"/>' +
+              '<path d="M12 19 L8.5 11.5 H15.5 Z" fill="currentColor" stroke="none" opacity=".35"/></svg>';
+  function setHead(t){
+    if (elHead._t === t) return;
+    elHead._t = t;
+    if (t) elHead.textContent = t; else elHead.innerHTML = ARROW;
+    elHead.setAttribute('aria-label', t ? 'Cap ' + t : 'Pas de cap');
+  }
+  setHead('');
+
+  /* ---------- Géométrie ---------- */
+  function hav(lat1, lon1, lat2, lon2){
+    var R = 6371000, rad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  /* ---------- GPS ---------- */
+  var anchor = null, lastTs = 0;
+  function pt(p){ return { lat: p.coords.latitude, lon: p.coords.longitude, t: p.timestamp }; }
+
+  function onPos(p){
+    var c = p.coords;
+    if (c.accuracy > MAX_ACC) return;
+    lastFix = Date.now();
+    setStatus('');
+
+    var v = (typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0) ? c.speed : null; // m/s
+
+    if (anchor) {
+      var dt = (p.timestamp - anchor.t) / 1000;
+      var d = hav(anchor.lat, anchor.lon, c.latitude, c.longitude);
+      var thr = Math.max(4, c.accuracy * 0.5);
+      if (v === null) v = (dt > 0 && d >= thr) ? d / dt : 0;
+      if (dt > 0 && d / dt > 70) { anchor = pt(p); return; }   // saut GPS aberrant
+      if (v * 3.6 >= MIN_KMH && d >= thr) {
+        odo += d; anchor = pt(p); saveState(); showKm();
+      }
+    } else {
+      anchor = pt(p);
+      if (v === null) v = 0;
+    }
+
+    var kmh = v * 3.6;
+    if (kmh < 0.8) kmh = 0;
+    lastKmh = kmh; showSpeed();
+
+    // Temps de roulage : on ne compte que le temps où l'on avance
+    if (kmh >= MIN_KMH && lastTs) {
+      var dtm = p.timestamp - lastTs;
+      if (dtm > 0 && dtm < 5000) { rideMs += dtm; saveState(); showRide(); }
+    }
+    lastTs = p.timestamp;
+
+    if (kmh < MIN_KMH) {
+      setHead('');
+    } else if (typeof c.heading === 'number' && isFinite(c.heading)) {
+      setHead(dirOf(c.heading));
+    }
+  }
+
+  function onErr(e){
+    if (e && e.code === 1) setStatus('Autorisez la localisation');
+    else setStatus('Recherche du GPS…');
+  }
+
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(onPos, onErr,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+  } else {
+    setStatus('GPS indisponible sur cet appareil');
+  }
+
+  /* ---------- Écran toujours allumé ---------- */
+  function lock(){
+    try {
+      if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(function(){});
+    } catch(e){}
+  }
+  lock();
+  document.addEventListener('pointerdown', lock, { once: true });
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') lock();
+  });
+})();
+</script>
+</body>
+</html>
