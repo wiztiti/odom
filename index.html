@@ -301,28 +301,53 @@
 
   /* ---------- GPS ---------- */
   var anchor = null, lastTs = 0;
+  var win = [];   // derniers points précis (~5 s) : sert à calculer la vitesse quand le GPS ne la fournit pas
   function pt(p){ return { lat: p.coords.latitude, lon: p.coords.longitude, t: p.timestamp }; }
+
+  function speedFromWindow(p, c){
+    win.push(pt(p));
+    while (win.length > 2 && p.timestamp - win[0].t > 5000) win.shift();
+    if (win.length < 2) return 0;
+    var a = win[0], dtw = (p.timestamp - a.t) / 1000;
+    if (dtw <= 0) return 0;
+    var dw = hav(a.lat, a.lon, c.latitude, c.longitude);
+    return dw >= Math.max(3, c.accuracy * 0.6) ? dw / dtw : 0;   // en dessous : bruit GPS, on est à l'arrêt
+  }
 
   function onPos(p){
     var c = p.coords;
-    if (c.accuracy > MAX_ACC) return;
-    lastFix = Date.now();
-    setStatus('');
+    var accOk = c.accuracy <= MAX_ACC;
+    var hasSpeed = typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0;   // vitesse mesurée par le GPS (m/s)
 
-    var v = (typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0) ? c.speed : null; // m/s
-
-    if (anchor) {
-      var dt = (p.timestamp - anchor.t) / 1000;
-      var d = hav(anchor.lat, anchor.lon, c.latitude, c.longitude);
-      var thr = Math.max(4, c.accuracy * 0.5);
-      if (v === null) v = (dt > 0 && d >= thr) ? d / dt : 0;
-      if (dt > 0 && d / dt > 70) { anchor = pt(p); return; }   // saut GPS aberrant
-      if (v * 3.6 >= MIN_KMH && d >= thr) {
-        odo += d; anchor = pt(p); saveState(); showKm();
-      }
+    var v;
+    if (hasSpeed) {
+      // La vitesse du GPS reste fiable même quand la position est imprécise : on l'affiche toujours
+      v = c.speed;
+      if (accOk) win.push(pt(p));
+    } else if (accOk) {
+      v = speedFromWindow(p, c);
     } else {
-      anchor = pt(p);
-      if (v === null) v = 0;
+      setStatus('Précision GPS faible');
+      return;
+    }
+
+    lastFix = Date.now();
+    setStatus(accOk ? '' : 'Précision GPS faible');
+
+    // Distance : uniquement avec une position précise, et seulement quand on avance
+    if (accOk) {
+      if (anchor) {
+        var dt = (p.timestamp - anchor.t) / 1000;
+        var d = hav(anchor.lat, anchor.lon, c.latitude, c.longitude);
+        var thr = Math.max(4, c.accuracy * 0.5);
+        if (dt > 0 && d / dt > 70) {
+          anchor = pt(p);                                   // saut GPS aberrant : on repart d'ici
+        } else if (v * 3.6 >= MIN_KMH && d >= thr) {
+          odo += d; anchor = pt(p); saveState(); showKm();
+        }
+      } else {
+        anchor = pt(p);
+      }
     }
 
     var kmh = v * 3.6;
