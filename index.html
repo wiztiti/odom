@@ -256,16 +256,37 @@
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
   var lastFix = 0;
+  var VERSION = 'v2';
+  var lastCall = 0, fixCount = 0, lastAcc = null, lastSpd = null, lastErr = '';
+  var debug = false, denied = false, watchId = null, restartAt = 0, startedAt = Date.now();
   function tick(){
     var d = new Date();
     var t = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     if (t !== lastT) { setSeg(elTime, t); lastT = t; }
-    if (lastFix && Date.now() - lastFix > 8000) {
+    var now = Date.now();
+    if (lastFix && now - lastFix > 8000) {
       lastKmh = 0; showSpeed();
       setHead('');
       setStatus('Signal GPS faible');
+    } else if (!lastFix && !denied) {
+      setStatus('Recherche du GPS… ' + Math.round((now - startedAt) / 1000) + ' s');
+    }
+    // Chien de garde : si le GPS ne donne plus rien pendant 10 s, on relance le suivi
+    if (!denied && lastCall && now - Math.max(lastCall, restartAt) > 10000) startWatch();
+    if (debug) {
+      setStatus(VERSION + ' · fix ' + fixCount +
+        ' · préc ' + (lastAcc === null ? '–' : Math.round(lastAcc) + ' m') +
+        ' · vit GPS ' + (lastSpd === null ? 'aucune' : lastSpd.toFixed(1) + ' m/s') +
+        ' · erreur ' + (lastErr || '–') +
+        ' · dernier ' + (lastCall ? Math.round((now - lastCall) / 1000) + ' s' : '–'));
     }
   }
+  // Un appui sur l'heure affiche ou masque les infos de diagnostic GPS
+  elTime.addEventListener('click', function(){
+    debug = !debug;
+    if (!debug) setStatus('');
+    tick();
+  });
   setInterval(tick, 1000);
   tick();
 
@@ -316,6 +337,8 @@
 
   function onPos(p){
     var c = p.coords;
+    lastCall = Date.now(); fixCount++; lastAcc = c.accuracy;
+    lastSpd = (typeof c.speed === 'number' && isFinite(c.speed)) ? c.speed : null;
     var accOk = c.accuracy <= MAX_ACC;
     var hasSpeed = typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0;   // vitesse mesurée par le GPS (m/s)
 
@@ -368,14 +391,25 @@
     }
   }
 
+  function startWatch(){
+    try { if (watchId !== null) navigator.geolocation.clearWatch(watchId); } catch(e){}
+    restartAt = Date.now();
+    watchId = navigator.geolocation.watchPosition(onPos, onErr,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  }
+
   function onErr(e){
-    if (e && e.code === 1) setStatus('Autorisez la localisation');
-    else setStatus('Recherche du GPS…');
+    lastErr = e ? e.code : '?';
+    if (e && e.code === 1) {
+      denied = true;
+      setStatus('Autorisez la localisation');
+    } else if (Date.now() - restartAt > 5000) {
+      startWatch();   // délai dépassé ou position indisponible : on relance le suivi
+    }
   }
 
   if ('geolocation' in navigator) {
-    navigator.geolocation.watchPosition(onPos, onErr,
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    startWatch();
   } else {
     setStatus('GPS indisponible sur cet appareil');
   }
