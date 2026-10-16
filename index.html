@@ -96,7 +96,10 @@
   #app.sun .panel::before{
     content:"";position:absolute;inset:-2.4vh 4vw;border-radius:24px;background:var(--panel);z-index:-1;
   }
-  #rowSpeed{--panel:var(--panel-speed)}
+  #rowSpeed{--panel:var(--panel-speed);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 4vh);transform:translateX(-50%);z-index:20;
+    background:#222;color:#fff;border:1px solid #666;border-radius:10px;padding:.55em 1em;font-size:min(4vw,2.4vh);white-space:nowrap}
+  #app.sun #toast{background:#fff;color:#000;border-color:#000}
   .trip{--panel:var(--panel-trip)}
   .clock{--panel:var(--panel-clock);cursor:pointer}
   #app.sun{--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--paused:#56626B}
@@ -218,7 +221,7 @@
         <h2>Aide</h2>
         <ul>
           <li class="histo" id="histoBtn" role="button" tabindex="0"><b>Historique ›</b><span>Vos séances, jour par jour.</span></li>
-          <li><b class="c-speed">Vitesse</b><span>Toucher : pause / reprise (reprise automatique au-dessus de 12 km/h).</span></li>
+          <li><b class="c-speed">Vitesse</b><span>Toucher : pause / reprise (reprise automatique au-dessus de 12 km/h). Appui long : précision 0,1 / 0,2 / « + ».</span></li>
           <li><b class="c-speed">km/h</b><span>Toucher : passer en knots, et le trip en miles. Re-toucher pour revenir.</span></li>
           <li><b class="c-trip">Trip</b><span>Distance et temps de roulage. Toucher : remise à zéro, avec confirmation.</span></li>
           <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
@@ -226,6 +229,7 @@
         <p class="hint">Toucher l'écran pour fermer</p>
       </div>
     </div>
+    <div id="toast" role="status" hidden></div>
     <div id="histo" role="dialog" aria-label="Historique" hidden>
       <div class="wrap">
         <div class="top"><h2>Historique</h2><button id="histoClose" type="button">Fermer</button></div>
@@ -244,6 +248,7 @@
   var RESUME_MS = 5000;//   ...pendant 5 s relance le comptage tout seul (mode km/h seulement)
   var KEY_P = 'compteur-velo-pause';  // pause en cours : '1' ou '0'
   var KEY_S = 'compteur-velo-soleil'; // mode soleil : '1' ou '0'
+  var KEY_M = 'compteur-velo-precision'; // 'd1' | 'd2' | 'plus'
   var KEY_H = 'compteur-velo-histo';  // historique : liste des séances terminées
   var KEY_C = 'compteur-velo-seance'; // séance en cours
   var SESS_GAP_MS = 60 * 60 * 1000;   // 1 h sans rouler : la séance est terminée
@@ -296,6 +301,10 @@
       } else if (ch === '.') {
         out.push('<rect x="' + (x+4) + '" y="90" width="10" height="10"/>');
         x += 18; lastDigit = false; afterDot = true;
+      } else if ((ch === '+' || ch === '_') && small) {
+        out.push('<g transform="translate(' + x + ',' + (H / 2) + ') scale(.5)" class="' + (ch === '+' ? 'on' : 'off') + '">' +
+                 '<rect x="6" y="45" width="44" height="10"/><rect x="23" y="22" width="10" height="56"/></g>');
+        x += ADV / 2; lastDigit = true; lastSmall = true;
       } else {
         var on = LIT[ch] || '';
         var half = small && afterDot;
@@ -325,7 +334,13 @@
 
   /* ---------- Formats ---------- */
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
-  function fmtSpeed(kmh){ return kmh.toFixed(1); }
+  // Précision de la vitesse (appui long sur la vitesse) : 'd1' = 0,1 · 'd2' = décimales paires · 'plus' = entier, « + » dès x,5
+  // d2 et plus tronquent (jamais au-dessus de la vitesse réelle).
+  function fmtSpeed(v){
+    if (speedMode === 'plus') { var n = Math.floor(v * 2 + 1e-9); return Math.floor(n / 2) + (n % 2 ? '+' : '_'); }
+    if (speedMode === 'd2')   { var q = Math.floor(v * 10 + 1e-9); q -= q % 2; return Math.floor(q / 10) + '.' + (q % 10); }
+    return v.toFixed(1);
+  }
   // Trip : en mètres (entiers) en mode km/h, en milles nautiques (1 mille = 1 852 m) en mode nœuds
   function fmtKm(m){ return unit === 'nm' ? (m / 1852).toFixed(2) : String(Math.round(m)); }
   function fmtRide(ms){
@@ -336,7 +351,7 @@
 
   /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
   var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0, sun = false,
-      hist = [], sess = null;
+      hist = [], sess = null, speedMode = 'd1';
   try {
     var sm = parseFloat(localStorage.getItem(KEY_M));
     if (isFinite(sm) && sm >= 0) odo = sm;
@@ -345,6 +360,8 @@
     if (localStorage.getItem(KEY_U) === 'nm') unit = 'nm';
     if (localStorage.getItem(KEY_P) === '1') paused = true;
     if (localStorage.getItem(KEY_S) === '1') sun = true;
+    var sm = localStorage.getItem(KEY_M);
+    if (sm === 'd2' || sm === 'plus') speedMode = sm;
     var sh = JSON.parse(localStorage.getItem(KEY_H) || '[]');
     if (Array.isArray(sh)) hist = sh.filter(function(x){ return x && typeof x.s === 'number' && typeof x.d === 'number'; });
     var sc = JSON.parse(localStorage.getItem(KEY_C) || 'null');
@@ -425,8 +442,29 @@
     try { localStorage.setItem(KEY_P, v ? '1' : '0'); } catch(e){}
     setHead(lastHead, lastDeg);
   }
+  var lpTimer = 0, lpDone = false, elToast = $('toast'), toastT = 0;
+  function toast(t){
+    elToast.textContent = t; elToast.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(function(){ elToast.hidden = true; }, 1800);
+  }
+  function lpCancel(){ clearTimeout(lpTimer); lpTimer = 0; }
+  elRowSpeed.addEventListener('pointerdown', function(e){
+    if (elU1.contains(e.target)) return;
+    lpDone = false; lpCancel();
+    lpTimer = setTimeout(function(){
+      lpDone = true; lpTimer = 0;
+      speedMode = speedMode === 'd1' ? 'd2' : speedMode === 'd2' ? 'plus' : 'd1';
+      try { localStorage.setItem(KEY_M, speedMode); } catch(e){}
+      showSpeed();
+      toast(speedMode === 'd1' ? 'Vitesse : 0,1 près' : speedMode === 'd2' ? 'Vitesse : 0,2 près' : 'Vitesse : entier et « + »');
+      if (navigator.vibrate) { try { navigator.vibrate(30); } catch(e){} }
+    }, 650);
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(function(n){ elRowSpeed.addEventListener(n, lpCancel); });
+  elRowSpeed.addEventListener('contextmenu', function(e){ e.preventDefault(); });
   elRowSpeed.addEventListener('click', function(e){
     if (elU1.contains(e.target)) return;   // le bouton d'unité garde sa propre action
+    if (lpDone) { lpDone = false; return; } // l'appui long ne déclenche pas la pause
     setPaused(!paused);
   });
   if (paused) elApp.classList.add('paused');
