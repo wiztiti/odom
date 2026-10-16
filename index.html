@@ -171,8 +171,9 @@
   function pts(poly, ox){
     return poly.map(function(p){ return (p[0] + ox) + ',' + p[1]; }).join(' ');
   }
-  function build(text){
-    var x = 0, out = [], lastDigit = false;
+  // small = true : les chiffres après le point sont dessinés à moitié de leur taille, alignés sur le bas
+  function build(text, small){
+    var x = 0, out = [], lastDigit = false, afterDot = false, lastSmall = false;
     for (var i = 0; i < text.length; i++) {
       var ch = text.charAt(i);
       if (ch === ':') {
@@ -181,25 +182,28 @@
         x += 20; lastDigit = false;
       } else if (ch === '.') {
         out.push('<rect x="' + (x+4) + '" y="90" width="10" height="10"/>');
-        x += 18; lastDigit = false;
+        x += 18; lastDigit = false; afterDot = true;
       } else {
         var on = LIT[ch] || '';
+        var half = small && afterDot;
+        if (half) out.push('<g transform="translate(' + x + ',' + (H / 2) + ') scale(.5)">');
         for (var k = 0; k < ORDER.length; k++) {
           var s = ORDER.charAt(k);
           out.push('<polygon class="' + (on.indexOf(s) >= 0 ? 'on' : 'off') +
-                   '" points="' + pts(SHAPES[s], x) + '"/>');
+                   '" points="' + pts(SHAPES[s], half ? 0 : x) + '"/>');
         }
-        x += ADV; lastDigit = true;
+        if (half) out.push('</g>');
+        x += half ? ADV / 2 : ADV; lastDigit = true; lastSmall = half;
       }
     }
-    if (lastDigit) x -= GAP;
+    if (lastDigit) x -= lastSmall ? GAP / 2 : GAP;
     return { w: x + SKEW,
              html: '<g transform="translate(' + SKEW + ',0) skewX(-8)">' + out.join('') + '</g>' };
   }
-  function setSeg(el, text){
+  function setSeg(el, text, small){
     if (el._t === text) return;
     el._t = text;
-    var r = build(text);
+    var r = build(text, small);
     el.setAttribute('viewBox', '0 0 ' + r.w + ' ' + H);
     el.style.aspectRatio = r.w + ' / ' + H;
     el.innerHTML = r.html;
@@ -235,7 +239,7 @@
   function showKm(){ setSeg(elKm, fmtKm(odo)); }
   function showRide(){ setSeg(elRide, fmtRide(rideMs)); }
   // Vitesse : mesurée en km/h en interne, convertie en nœuds à l'affichage (1 kn = 1,852 km/h)
-  function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh)); }
+  function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh), true); }
   function applyUnit(){
     elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
     elU2u.textContent = unit === 'nm' ? 'miles' : 'm';
@@ -276,7 +280,7 @@
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
   var lastFix = 0;
-  var VERSION = 'v3';
+  var VERSION = 'v4';
   var lastCall = 0, fixCount = 0, lastAcc = null, lastSpd = null, lastErr = '';
   var debug = false, denied = false, watchId = null, restartAt = 0, startedAt = Date.now();
   function tick(){
