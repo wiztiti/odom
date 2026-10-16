@@ -17,7 +17,8 @@
     --km:#39FF7A;      /* vert vif */
     --time:#FFFFFF;
     --cap:#FFB534;     /* ambre */
-    --ride:#FF6AD5;    /* rose vif : temps de roulage */
+    --ride:#FFB8F0;    /* rose clair : temps de roulage, lisible en plein soleil */
+    --sp-h:min(29vw,18vh);   /* hauteur des chiffres de la vitesse */
     --dim:#9a9a9a;
   }
   [hidden]{display:none!important}
@@ -31,7 +32,6 @@
     -webkit-tap-highlight-color:transparent;
   }
   main{flex:1;width:100%;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center}
-  footer{padding:1.5vh 0 3vh}
 
   /* Les chiffres sont dans la colonne centrale, donc centrés sur l'écran ; unités et cap sont à droite */
   .row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:baseline;column-gap:2vw;width:100%;white-space:nowrap;line-height:1}
@@ -42,21 +42,38 @@
   .seg{display:block;fill:currentColor;overflow:visible}
   .seg .off{opacity:.09}
 
-  #speed{height:min(29vw,18vh);color:var(--speed)}
-  /* "km/h" est un bouton : un appui bascule entre km/h et nœuds (kn) */
+  #speed{height:var(--sp-h);color:var(--speed)}
+  /* "km/h" est un bouton sans cadre : un appui bascule entre km/h et nœuds.
+     Centré sur la vitesse puis descendu d'un peu plus d'un cinquième de sa hauteur. */
   #u1{
-    align-self:center;
+    align-self:center;transform:translateY(calc(var(--sp-h) * .22));
     font:inherit;font-size:min(4.6vw,2.8vh);font-weight:700;line-height:1;color:var(--speed);
-    background:none;border:1.5px solid rgba(79,195,255,.45);border-radius:8px;
-    padding:.3em .55em;margin-left:.2em;cursor:pointer;
+    background:none;border:0;padding:.5em .6em;margin-left:-.2em;cursor:pointer;
   }
-  #u1:active{background:rgba(79,195,255,.2)}
-  #u1:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  #u1:active{opacity:.55}
+  #u1:focus-visible{outline:3px solid #fff;outline-offset:2px}
 
   #km{height:min(14vw,9vh);color:var(--km)}
   /* Bloc trip : distance + temps de roulage, rapprochés */
-  .trip,.clock{width:100%;display:flex;flex-direction:column;align-items:center;gap:1vh}
+  .trip,.clock{width:100%;display:flex;flex-direction:column;align-items:center;gap:1.4vh}
   .clock{gap:5vh}
+  /* Un appui sur le bloc trip propose la remise à zéro */
+  .trip{position:relative;cursor:pointer}
+  .trip:focus-visible{outline:3px solid #fff;outline-offset:4px}
+  #confirm{
+    position:absolute;left:0;right:0;top:-1.5vh;bottom:-1.5vh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.6vh;
+    background:var(--bg);cursor:default;
+  }
+  #confirm p{margin:0;font-size:min(6vw,3.8vh);font-weight:700;color:var(--km)}
+  #confirm .btns{display:flex;gap:4vw}
+  #confirm button{
+    font:inherit;font-size:min(5vw,3.2vh);font-weight:800;letter-spacing:.04em;
+    min-width:min(28vw,16vh);padding:.55em 1em;border-radius:999px;cursor:pointer;
+  }
+  #yes{background:var(--km);color:#000;border:2px solid var(--km)}
+  #no{background:transparent;color:var(--time);border:2px solid rgba(255,255,255,.6)}
+  #confirm button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   /* "trip" au-dessus de "km", en plus petit ; le bas de "km" s'aligne sur le bas des chiffres */
   #u2{
     display:flex;flex-direction:column;align-items:flex-start;gap:.3em;align-self:end;margin-bottom:-.2em;
@@ -64,7 +81,7 @@
   }
   #u2 small{font-size:.55em;font-weight:700;letter-spacing:.08em}
 
-  #ride{height:min(5vw,3.2vh);color:var(--ride)}
+  #ride{height:min(9.5vw,6vh);color:var(--ride)}
 
   #time{height:min(12vw,7.5vh);color:var(--time)}
   /* Cap sous l'heure : lettres, ou petite boussole quand il n'y a pas de cap */
@@ -72,15 +89,6 @@
     display:flex;align-items:center;justify-content:center;height:1em;
     font-size:min(9vw,5.5vh);font-weight:800;line-height:1;color:var(--cap);
   }
-
-  #reset{
-    font:inherit;font-size:min(3vw,1.9vh);font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-    min-width:9em;padding:.65em 1.4em;border-radius:999px;
-    background:var(--km);color:#000;border:0;cursor:pointer;
-    transition:background .15s;
-  }
-  #reset.armed{background:var(--cap)}
-  #reset:focus-visible{outline:3px solid #fff;outline-offset:3px}
 
   #status{
     position:absolute;left:0;right:0;text-align:center;
@@ -98,15 +106,23 @@
       <button id="u1" class="side" type="button" aria-label="Changer d'unité : km/h ou nœuds">km/h</button>
     </section>
 
-    <div class="trip">
+    <div class="trip" id="trip" role="button" tabindex="0" aria-label="Trip : toucher pour remettre à zéro">
       <section class="row">
         <svg id="km" class="num seg" role="img" aria-label="Distance"></svg>
-        <span id="u2" class="side"><small>trip</small><span id="u2u">km</span></span>
+        <span id="u2" class="side"><small>trip</small><span id="u2u">m</span></span>
       </section>
 
       <section class="row">
         <svg id="ride" class="num seg" role="img" aria-label="Temps de roulage"></svg>
       </section>
+
+      <div id="confirm" hidden>
+        <p>remettre à zéro ?</p>
+        <div class="btns">
+          <button id="yes" type="button">Oui</button>
+          <button id="no" type="button">Non</button>
+        </div>
+      </div>
     </div>
 
     <div class="clock">
@@ -120,10 +136,6 @@
     </div>
   </main>
 
-  <footer>
-    <button id="reset" type="button">Reset</button>
-  </footer>
-
 <script>
 (function(){
   'use strict';
@@ -136,8 +148,9 @@
 
   var $ = function(id){ return document.getElementById(id); };
   var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elTime = $('time'),
-      elHead = $('head'), elReset = $('reset'), elStatus = $('status'),
-      elU1 = $('u1'), elU2u = $('u2u');
+      elHead = $('head'), elStatus = $('status'),
+      elU1 = $('u1'), elU2u = $('u2u'),
+      elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no');
 
   /* ---------- Affichage à segments (7 segments) ---------- */
   var S = 5, D = 1.5, W = 56, H = 100, ADV = 66, GAP = ADV - W, SKEW = 14;
@@ -196,7 +209,8 @@
   /* ---------- Formats ---------- */
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
   function fmtSpeed(kmh){ return kmh.toFixed(1); }
-  function fmtKm(m){ return (m / (unit === 'nm' ? 1852 : 1000)).toFixed(2); }
+  // Trip : en mètres (entiers) en mode km/h, en milles nautiques (1 mille = 1 852 m) en mode nœuds
+  function fmtKm(m){ return unit === 'nm' ? (m / 1852).toFixed(2) : String(Math.round(m)); }
   function fmtRide(ms){
     var s = Math.floor(ms / 1000);
     var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -224,7 +238,7 @@
   function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh)); }
   function applyUnit(){
     elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
-    elU2u.textContent = unit === 'nm' ? 'miles' : 'km';
+    elU2u.textContent = unit === 'nm' ? 'miles' : 'm';
     showSpeed();
     showKm();
   }
@@ -236,27 +250,33 @@
   showRide();
   applyUnit();
 
-  /* ---------- Reset en deux appuis (évite le reset accidentel) ---------- */
-  var armed = false, armTimer = null;
-  function disarm(){
-    armed = false; clearTimeout(armTimer);
-    elReset.textContent = 'Reset'; elReset.classList.remove('armed');
+  /* ---------- Remise à zéro : appui sur le trip, puis confirmation ---------- */
+  var confirmTimer = null;
+  function openConfirm(){
+    elConfirm.hidden = false;
+    clearTimeout(confirmTimer);
+    confirmTimer = setTimeout(closeConfirm, 6000);   // sans réponse, la question disparaît
   }
-  elReset.addEventListener('click', function(){
-    if (!armed) {
-      armed = true;
-      elReset.textContent = 'Confirmer';
-      elReset.classList.add('armed');
-      armTimer = setTimeout(disarm, 3000);
-    } else {
-      odo = 0; rideMs = 0; saveState(); showKm(); showRide(); disarm();
-    }
+  function closeConfirm(){
+    clearTimeout(confirmTimer);
+    elConfirm.hidden = true;
+  }
+  elTrip.addEventListener('click', function(e){
+    if (elConfirm.contains(e.target)) return;        // les boutons Oui/Non ont leurs propres actions
+    openConfirm();
   });
+  elTrip.addEventListener('keydown', function(e){
+    if ((e.key === 'Enter' || e.key === ' ') && elConfirm.hidden) { e.preventDefault(); openConfirm(); }
+  });
+  elYes.addEventListener('click', function(){
+    odo = 0; rideMs = 0; saveState(); showKm(); showRide(); closeConfirm();
+  });
+  elNo.addEventListener('click', closeConfirm);
 
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
   var lastFix = 0;
-  var VERSION = 'v2';
+  var VERSION = 'v3';
   var lastCall = 0, fixCount = 0, lastAcc = null, lastSpd = null, lastErr = '';
   var debug = false, denied = false, watchId = null, restartAt = 0, startedAt = Date.now();
   function tick(){
