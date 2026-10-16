@@ -16,8 +16,9 @@
     --speed:#4FC3FF;   /* bleu ciel vif */
     --km:#39FF7A;      /* vert vif */
     --time:#FFFFFF;
-    --cap:#FFB534;     /* ambre */
+    --cap:#FFE45C;     /* jaune clair : cap, très lumineux en plein soleil */
     --ride:#FFB8F0;    /* rose clair : temps de roulage, lisible en plein soleil */
+    --paused:#7c8890;  /* gris : valeurs figées pendant la pause */
     --sp-h:min(29vw,18vh);   /* hauteur des chiffres de la vitesse */
     --dim:#9a9a9a;
   }
@@ -82,13 +83,19 @@
   #u2 small{font-size:.55em;font-weight:700;letter-spacing:.08em}
 
   #ride{height:min(9.5vw,6vh);color:var(--ride)}
+  /* Pause manuelle : vitesse, distance et temps passent en gris, "PAUSE" remplace le cap */
+  #app.paused #speed,#app.paused #km,#app.paused #ride{color:var(--paused)}
+  #speed{cursor:pointer}
 
   #time{height:min(12vw,7.5vh);color:var(--time)}
-  /* Cap sous l'heure : lettres, ou petite boussole quand il n'y a pas de cap */
+  /* Cap sous l'heure : lettres + degrés, ou rien sans cap (la hauteur reste réservée), ou PAUSE */
   #head{
-    display:flex;align-items:center;justify-content:center;height:1em;
-    font-size:min(9vw,5.5vh);font-weight:800;line-height:1;color:var(--cap);
+    display:flex;align-items:center;justify-content:center;min-height:1em;
+    font-size:min(11.5vw,7vh);font-weight:800;line-height:1;color:var(--cap);
   }
+  #hval{display:flex;align-items:center;gap:.3em}
+  #hl{display:inline-block;width:1.9em;text-align:right}   /* 1 à 2 lettres : N, NE, SW... position stable */
+  #hd{height:.78em;color:var(--cap)}
 
   #status{
     position:absolute;left:0;right:0;text-align:center;
@@ -100,8 +107,8 @@
 <body>
   <div id="status" role="status">Recherche du GPS…</div>
 
-  <main>
-    <section class="row">
+  <main id="app">
+    <section class="row" id="rowSpeed">
       <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
       <button id="u1" class="side" type="button" aria-label="Changer d'unité : km/h ou nœuds">km/h</button>
     </section>
@@ -131,7 +138,10 @@
       </section>
 
       <section class="row">
-        <span id="head" class="num" role="img" aria-label="Cap"></span>
+        <span id="head" class="num" role="img" aria-label="Cap">
+          <span id="hmsg"></span>
+          <span id="hval" hidden><span id="hl"></span><svg id="hd" class="seg" aria-hidden="true"></svg></span>
+        </span>
       </section>
     </div>
   </main>
@@ -142,6 +152,9 @@
 
   var MAX_ACC = 30;    // m : fixes moins précis que ça sont ignorés
   var MIN_KMH = 2;     // km/h : en dessous, on considère l'arrêt (pas de cumul, cap masqué)
+  var RESUME_KMH = 12; // km/h : en pause, rouler au-dessus de cette vitesse...
+  var RESUME_MS = 5000;//   ...pendant 5 s relance le comptage tout seul (mode km/h seulement)
+  var KEY_P = 'compteur-velo-pause';  // pause en cours : '1' ou '0'
   var KEY_M = 'compteur-velo-m';    // distance en mètres
   var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
   var KEY_U = 'compteur-velo-unit'; // unité choisie : 'km' (km/h) ou 'nm' (nœuds / milles nautiques)
@@ -150,7 +163,9 @@
   var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elTime = $('time'),
       elHead = $('head'), elStatus = $('status'),
       elU1 = $('u1'), elU2u = $('u2u'),
-      elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no');
+      elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no'),
+      elApp = $('app'), elRowSpeed = $('rowSpeed'),
+      elHmsg = $('hmsg'), elHval = $('hval'), elHl = $('hl'), elHd = $('hd');
 
   /* ---------- Affichage à segments (7 segments) ---------- */
   var S = 5, D = 1.5, W = 56, H = 100, ADV = 66, GAP = ADV - W, SKEW = 14;
@@ -180,6 +195,9 @@
         out.push('<rect x="' + (x+5) + '" y="25" width="10" height="10"/>' +
                  '<rect x="' + (x+5) + '" y="65" width="10" height="10"/>');
         x += 20; lastDigit = false;
+      } else if (ch === '°') {
+        out.push('<circle cx="' + (x+12) + '" cy="13" r="9" fill="none" stroke="currentColor" stroke-width="5"/>');
+        x += 28; lastDigit = false;
       } else if (ch === '.') {
         out.push('<rect x="' + (x+4) + '" y="90" width="10" height="10"/>');
         x += 18; lastDigit = false; afterDot = true;
@@ -222,13 +240,14 @@
   }
 
   /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
-  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km';
+  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0;
   try {
     var sm = parseFloat(localStorage.getItem(KEY_M));
     if (isFinite(sm) && sm >= 0) odo = sm;
     var st = parseFloat(localStorage.getItem(KEY_T));
     if (isFinite(st) && st >= 0) rideMs = st;
     if (localStorage.getItem(KEY_U) === 'nm') unit = 'nm';
+    if (localStorage.getItem(KEY_P) === '1') paused = true;
   } catch(e){}
   function saveState(){
     try {
@@ -277,10 +296,23 @@
   });
   elNo.addEventListener('click', closeConfirm);
 
+  /* ---------- Pause manuelle : appui sur la vitesse ---------- */
+  function setPaused(v){
+    paused = v; fastSince = 0;
+    if (v) elApp.classList.add('paused'); else elApp.classList.remove('paused');
+    try { localStorage.setItem(KEY_P, v ? '1' : '0'); } catch(e){}
+    setHead(lastHead, lastDeg);
+  }
+  elRowSpeed.addEventListener('click', function(e){
+    if (elU1.contains(e.target)) return;   // le bouton d'unité garde sa propre action
+    setPaused(!paused);
+  });
+  if (paused) elApp.classList.add('paused');
+
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
   var lastFix = 0;
-  var VERSION = 'v4';
+  var VERSION = 'v7';
   var lastCall = 0, fixCount = 0, lastAcc = null, lastSpd = null, lastErr = '';
   var debug = false, denied = false, watchId = null, restartAt = 0, startedAt = Date.now();
   function tick(){
@@ -298,7 +330,7 @@
     // Chien de garde : si le GPS ne donne plus rien pendant 10 s, on relance le suivi
     if (!denied && lastCall && now - Math.max(lastCall, restartAt) > 10000) startWatch();
     if (debug) {
-      setStatus(VERSION + ' · fix ' + fixCount +
+      setStatus(VERSION + (paused ? ' · PAUSE' : '') + ' · fix ' + fixCount +
         ' · préc ' + (lastAcc === null ? '–' : Math.round(lastAcc) + ' m') +
         ' · vit GPS ' + (lastSpd === null ? 'aucune' : lastSpd.toFixed(1) + ' m/s') +
         ' · erreur ' + (lastErr || '–') +
@@ -322,16 +354,26 @@
   /* ---------- Cap ---------- */
   var DIRS = ['N','NE','E','SE','S','SW','W','NW'];
   function dirOf(deg){ return DIRS[Math.round(deg / 45) % 8]; }
-  // Boussole discrète, affichée tant qu'il n'y a pas de cap
-  var ARROW = '<svg viewBox="0 0 24 24" style="height:.95em;width:.95em;opacity:.7" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
-              '<circle cx="12" cy="12" r="10"/>' +
-              '<path d="M12 5 L15.5 12.5 H8.5 Z" fill="currentColor" stroke="none"/>' +
-              '<path d="M12 19 L8.5 11.5 H15.5 Z" fill="currentColor" stroke="none" opacity=".35"/></svg>';
-  function setHead(t){
-    if (elHead._t === t) return;
-    elHead._t = t;
-    if (t) elHead.textContent = t; else elHead.innerHTML = ARROW;
-    elHead.setAttribute('aria-label', t ? 'Cap ' + t : 'Pas de cap');
+  // t = lettres du cap (N, NE...), deg = cap en degrés (0 à 359). Sans cap : rien (la place reste réservée) ; en pause : PAUSE
+  var lastHead = '', lastDeg = null;
+  function setHead(t, deg){
+    lastHead = t; lastDeg = (typeof deg === 'number' && isFinite(deg)) ? deg : null;
+    var showVal = !paused && !!t;
+    var key = paused ? 'P' : (t ? 'V' : 'A');
+    if (elHmsg._k !== key) {
+      elHmsg._k = key;
+      elHmsg.textContent = paused ? 'PAUSE' : '';
+    }
+    elHmsg.hidden = showVal;
+    elHval.hidden = !showVal;
+    var label = paused ? 'En pause' : 'Pas de cap';
+    if (showVal) {
+      var d = lastDeg === null ? 0 : ((Math.round(lastDeg) % 360) + 360) % 360;
+      elHl.textContent = t;
+      setSeg(elHd, ('00' + d).slice(-3) + '°');
+      label = 'Cap ' + t + ', ' + d + ' degrés';
+    }
+    elHead.setAttribute('aria-label', label);
   }
   setHead('');
 
@@ -383,7 +425,9 @@
 
     // Distance : uniquement avec une position précise, et seulement quand on avance
     if (accOk) {
-      if (anchor) {
+      if (paused) {
+        anchor = pt(p);                                     // en pause : rien n'est compté, on suit seulement la position
+      } else if (anchor) {
         var dt = (p.timestamp - anchor.t) / 1000;
         var d = hav(anchor.lat, anchor.lon, c.latitude, c.longitude);
         var thr = Math.max(4, c.accuracy * 0.5);
@@ -401,8 +445,16 @@
     if (kmh < 0.8) kmh = 0;
     lastKmh = kmh; showSpeed();
 
-    // Temps de roulage : on ne compte que le temps où l'on avance
-    if (kmh >= MIN_KMH && lastTs) {
+    // Reprise automatique : en pause, rouler à plus de 12 km/h pendant 5 s relance le comptage
+    if (paused && unit === 'km' && kmh >= RESUME_KMH) {
+      if (!fastSince) fastSince = p.timestamp;
+      else if (p.timestamp - fastSince >= RESUME_MS) setPaused(false);
+    } else {
+      fastSince = 0;
+    }
+
+    // Temps de roulage : on ne compte que le temps où l'on avance, hors pause
+    if (!paused && kmh >= MIN_KMH && lastTs) {
       var dtm = p.timestamp - lastTs;
       if (dtm > 0 && dtm < 5000) { rideMs += dtm; saveState(); showRide(); }
     }
@@ -411,7 +463,7 @@
     if (kmh < MIN_KMH) {
       setHead('');
     } else if (typeof c.heading === 'number' && isFinite(c.heading)) {
-      setHead(dirOf(c.heading));
+      setHead(dirOf(c.heading), c.heading);
     }
   }
 
