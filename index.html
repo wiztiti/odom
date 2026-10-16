@@ -18,7 +18,7 @@
     --time:#FFFFFF;
     --cap:#FFE45C;     /* jaune clair : cap, très lumineux en plein soleil */
     --ride:#FFB8F0;    /* rose clair : temps de roulage, lisible en plein soleil */
-    --paused:#7c8890;  /* gris : valeurs figées pendant la pause */
+    --paused:#7c8890; --fuel:#FFA94D;  /* gris : valeurs figées pendant la pause */
     --panel-speed:#D6EEFF;   /* cadrans du mode soleil : bleu très clair, */
     --panel-trip:#D8F6DF;    /*   vert très clair, */
     --panel-clock:#FFF3BF;   /*   jaune très clair */
@@ -79,15 +79,18 @@
   #no{background:transparent;color:var(--time);border:2px solid rgba(255,255,255,.6)}
   #confirm button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   /* "trip" au-dessus de "km", en plus petit ; le bas de "km" s'aligne sur le bas des chiffres */
-  #u2{
+  #u2,#u3{
     display:flex;flex-direction:column;align-items:flex-start;gap:.3em;align-self:end;margin-bottom:-.2em;
     font-size:min(4vw,2.5vh);font-weight:700;color:var(--km);line-height:1;
   }
-  #u2 small{font-size:.55em;font-weight:700;letter-spacing:.08em}
+  #u3{color:var(--fuel)}
+  #u2 small,#u3 small{font-size:.55em;font-weight:700;letter-spacing:.08em}
 
   #ride{height:min(9.5vw,6vh);color:var(--ride)}
+  #fuel{height:min(8vw,5vh);color:var(--fuel)}
+  #rowFuel{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   /* Pause manuelle : vitesse, distance et temps passent en gris, "PAUSE" remplace le cap */
-  #app.paused #speed,#app.paused #km,#app.paused #ride{color:var(--paused)}
+  #app.paused #speed,#app.paused #km,#app.paused #ride,#app.paused #fuel{color:var(--paused)}
   #speed{cursor:pointer}
 
   /* Mode soleil (appui sur l'heure) : trois cadrans clairs derrière les blocs, chiffres foncés.
@@ -102,7 +105,7 @@
   #app.sun #toast{background:#fff;color:#000;border-color:#000}
   .trip{--panel:var(--panel-trip)}
   .clock{--panel:var(--panel-clock);cursor:pointer}
-  #app.sun{--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--paused:#56626B}
+  #app.sun{--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
   #app.sun .seg .off{opacity:.045}
   #app.sun #confirm{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
   #app.sun #confirm p{color:var(--km)}
@@ -194,6 +197,11 @@
         <svg id="ride" class="num seg" role="img" aria-label="Temps de roulage"></svg>
       </section>
 
+      <section class="row" id="rowFuel" hidden>
+        <svg id="fuel" class="num seg" role="img" aria-label="Litres consommés (estimation)"></svg>
+        <span id="u3" class="side"><small>conso</small><span>litres</span></span>
+      </section>
+
       <div id="confirm" hidden>
         <p>remettre à zéro ?</p>
         <div class="btns">
@@ -223,7 +231,7 @@
           <li class="histo" id="histoBtn" role="button" tabindex="0"><b>Historique ›</b><span>Vos séances, jour par jour.</span></li>
           <li><b class="c-speed">Vitesse</b><span>Toucher : pause / reprise (reprise automatique au-dessus de 12 km/h). Appui long : précision 0,1 / 0,2 / « + ».</span></li>
           <li><b class="c-speed">km/h</b><span>Toucher : passer en knots, et le trip en miles. Re-toucher pour revenir.</span></li>
-          <li><b class="c-trip">Trip</b><span>Distance et temps de roulage. Toucher : remise à zéro, avec confirmation.</span></li>
+          <li><b class="c-trip">Trip</b><span>Distance et temps de roulage. Toucher : remise à zéro, avec confirmation. En knots : litres estimés (appui long : calibrage).</span></li>
           <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
         </ul>
         <p class="hint">Toucher l'écran pour fermer</p>
@@ -248,18 +256,20 @@
   var RESUME_MS = 5000;//   ...pendant 5 s relance le comptage tout seul (mode km/h seulement)
   var KEY_P = 'compteur-velo-pause';  // pause en cours : '1' ou '0'
   var KEY_S = 'compteur-velo-soleil'; // mode soleil : '1' ou '0'
-  var KEY_M = 'compteur-velo-precision'; // 'd1' | 'd2' | 'plus'
+  var KEY_PR = 'compteur-velo-precision'; // 'd1' | 'd2' | 'plus'
   var KEY_H = 'compteur-velo-histo';  // historique : liste des séances terminées
   var KEY_C = 'compteur-velo-seance'; // séance en cours
   var SESS_GAP_MS = 60 * 60 * 1000;   // 1 h sans rouler : la séance est terminée
   var SESS_MIN_M = 100;               // une séance de moins de 100 m n'est pas enregistrée
   var HIST_MAX = 2000;                // nombre maximum de séances conservées
   var KEY_M = 'compteur-velo-m';    // distance en mètres
+  var KEY_L = 'compteur-velo-litres';   // litres estimés depuis le reset (mode knots)
+  var KEY_K = 'compteur-velo-calib';    // coefficient de calibrage de la conso
   var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
   var KEY_U = 'compteur-velo-unit'; // unité choisie : 'km' (km/h) ou 'nm' (nœuds / milles nautiques)
 
   var $ = function(id){ return document.getElementById(id); };
-  var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elTime = $('time'),
+  var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elFuel = $('fuel'), elRowFuel = $('rowFuel'), elTime = $('time'),
       elHead = $('head'), elStatus = $('status'),
       elU1 = $('u1'), elU2u = $('u2u'),
       elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no'),
@@ -351,7 +361,7 @@
 
   /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
   var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0, sun = false,
-      hist = [], sess = null, speedMode = 'd1';
+      hist = [], sess = null, speedMode = 'd1', fuel = 0, fuelCal = 1;
   try {
     var sm = parseFloat(localStorage.getItem(KEY_M));
     if (isFinite(sm) && sm >= 0) odo = sm;
@@ -360,8 +370,12 @@
     if (localStorage.getItem(KEY_U) === 'nm') unit = 'nm';
     if (localStorage.getItem(KEY_P) === '1') paused = true;
     if (localStorage.getItem(KEY_S) === '1') sun = true;
-    var sm = localStorage.getItem(KEY_M);
-    if (sm === 'd2' || sm === 'plus') speedMode = sm;
+    var sp = localStorage.getItem(KEY_PR);
+    if (sp === 'd2' || sp === 'plus') speedMode = sp;
+    var sl = parseFloat(localStorage.getItem(KEY_L));
+    if (isFinite(sl) && sl >= 0) fuel = sl;
+    var sk = parseFloat(localStorage.getItem(KEY_K));
+    if (isFinite(sk) && sk > 0.3 && sk < 3) fuelCal = sk;
     var sh = JSON.parse(localStorage.getItem(KEY_H) || '[]');
     if (Array.isArray(sh)) hist = sh.filter(function(x){ return x && typeof x.s === 'number' && typeof x.d === 'number'; });
     var sc = JSON.parse(localStorage.getItem(KEY_C) || 'null');
@@ -371,6 +385,7 @@
     try {
       localStorage.setItem(KEY_M, String(odo));
       localStorage.setItem(KEY_T, String(rideMs));
+      localStorage.setItem(KEY_L, String(fuel));
     } catch(e){}
   }
   /* ---------- Séances : enregistrées automatiquement, indépendamment du trip ----------
@@ -378,9 +393,10 @@
      ou quand le trip est remis à zéro. Elle ne compte ni la pause ni l'arrêt. */
   function saveSess(){ try { localStorage.setItem(KEY_C, JSON.stringify(sess)); } catch(e){} }
   function saveHist(){ try { localStorage.setItem(KEY_H, JSON.stringify(hist)); } catch(e){} }
-  function sessAdd(dm, dms, ts, kmh){
+  function sessAdd(dm, dms, ts, kmh, l){
     if (!sess) sess = { s: ts, e: ts, d: 0, t: 0, v: 0, u: unit };   // u : unité utilisée au départ
     sess.e = ts; sess.d += dm; sess.t += dms;
+    if (l) sess.l = (sess.l || 0) + l;
     if (kmh > sess.v && kmh < 90) sess.v = kmh;                    // vitesse max, hors pics GPS aberrants
     saveSess();
   }
@@ -393,11 +409,33 @@
     sess = null;
     saveSess();
   }
+  /* ---------- Consommation estimée (mode knots) ----------
+     Table vitesse (nœuds) -> litres/heure, interpolée linéairement, multipliée par le coefficient de calibrage.
+     Valeurs de départ pour un 115 ch 2 temps : à ajuster avec les pleins (appui long sur les litres). */
+  var FUEL_PTS = [[1,3.5],[3,6],[8,12],[13,18],[18,21],[25,30],[30,40],[35,45]];
+  function fuelRate(kn){
+    var P = FUEL_PTS, n = P.length;
+    if (kn <= P[0][0]) return P[0][1];
+    if (kn >= P[n-1][0]) return P[n-1][1];
+    for (var i = 1; i < n; i++) {
+      if (kn <= P[i][0]) {
+        var a = P[i-1], b = P[i];
+        return a[1] + (b[1] - a[1]) * (kn - a[0]) / (b[0] - a[0]);
+      }
+    }
+    return P[n-1][1];
+  }
+  function fmtFuel(l){ return (l < 100 ? l.toFixed(1) : String(Math.round(l))); }
+  function showFuel(){
+    elRowFuel.hidden = unit !== 'nm';
+    if (unit === 'nm') setSeg(elFuel, fmtFuel(fuel));
+  }
   function showKm(){ setSeg(elKm, fmtKm(odo)); }
   function showRide(){ setSeg(elRide, fmtRide(rideMs)); }
   // Vitesse : mesurée en km/h en interne, convertie en nœuds à l'affichage (1 kn = 1,852 km/h)
   function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh), true); }
   function applyUnit(){
+    showFuel();
     elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
     elU2u.textContent = unit === 'nm' ? 'miles' : 'm';
     showSpeed();
@@ -422,15 +460,43 @@
     clearTimeout(confirmTimer);
     elConfirm.hidden = true;
   }
+  /* Appui long sur les litres : calibrage (coefficient appliqué à toute la table) */
+  var fuelTimer = 0, fuelLong = false, fuelSwallow = false;
+  function askCal(){
+    var cur = String(Math.round(fuelCal * 100) / 100).replace('.', ',');
+    var r = window.prompt('Calibrage de la conso (1 = table d\'origine).\nExemple : l\'appli compte 5 L pour 4,2 L réels → 0,84.\nCoefficient :', cur);
+    if (r === null) return;
+    var k = parseFloat(String(r).replace(',', '.'));
+    if (isFinite(k) && k > 0.3 && k < 3) {
+      fuelCal = k;
+      try { localStorage.setItem(KEY_K, String(k)); } catch(e){}
+      toast('Calibrage : ×' + String(Math.round(k * 100) / 100).replace('.', ','));
+    }
+  }
+  elRowFuel.addEventListener('pointerdown', function(){
+    fuelLong = false; clearTimeout(fuelTimer);
+    fuelTimer = setTimeout(function(){ fuelLong = true; if (navigator.vibrate) { try { navigator.vibrate(30); } catch(e){} } }, 650);
+  });
+  elRowFuel.addEventListener('pointerup', function(){
+    clearTimeout(fuelTimer);
+    if (fuelLong) {
+      fuelLong = false; fuelSwallow = true;
+      setTimeout(function(){ fuelSwallow = false; }, 600);
+      setTimeout(askCal, 80);
+    }
+  });
+  ['pointercancel','pointerleave'].forEach(function(n){ elRowFuel.addEventListener(n, function(){ clearTimeout(fuelTimer); fuelLong = false; }); });
+  elRowFuel.addEventListener('contextmenu', function(e){ e.preventDefault(); });
   elTrip.addEventListener('click', function(e){
-    if (elConfirm.contains(e.target)) return;        // les boutons Oui/Non ont leurs propres actions
+    if (elConfirm.contains(e.target)) return;
+    if (fuelSwallow) return;   // l'appui long sur les litres ne propose pas la remise à zéro        // les boutons Oui/Non ont leurs propres actions
     openConfirm();
   });
   elTrip.addEventListener('keydown', function(e){
     if ((e.key === 'Enter' || e.key === ' ') && elConfirm.hidden) { e.preventDefault(); openConfirm(); }
   });
   elYes.addEventListener('click', function(){
-    odo = 0; rideMs = 0; saveState(); showKm(); showRide(); closeConfirm();
+    odo = 0; rideMs = 0; fuel = 0; saveState(); showKm(); showRide(); showFuel(); closeConfirm();
     closeSess();   // la remise à zéro termine la séance en cours
   });
   elNo.addEventListener('click', closeConfirm);
@@ -454,7 +520,7 @@
     lpTimer = setTimeout(function(){
       lpDone = true; lpTimer = 0;
       speedMode = speedMode === 'd1' ? 'd2' : speedMode === 'd2' ? 'plus' : 'd1';
-      try { localStorage.setItem(KEY_M, speedMode); } catch(e){}
+      try { localStorage.setItem(KEY_PR, speedMode); } catch(e){}
       showSpeed();
       toast(speedMode === 'd1' ? 'Vitesse : 0,1 près' : speedMode === 'd2' ? 'Vitesse : 0,2 près' : 'Vitesse : entier et « + »');
       if (navigator.vibrate) { try { navigator.vibrate(30); } catch(e){} }
@@ -505,6 +571,7 @@
   function spd(kmh){
     return unit === 'nm' ? (kmh / 1.852).toFixed(1).replace('.', ',') + ' knots' : kmh.toFixed(1).replace('.', ',') + ' km/h';
   }
+  function fl(l){ return l.toFixed(1).replace('.', ',') + ' L'; }
   function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
   function renderHisto(){
     var all = hist.slice();
@@ -518,14 +585,14 @@
       days[days.length - 1].items.push(x);
     });
     days.forEach(function(g){
-      var td = 0, tt = 0;
-      g.items.forEach(function(x){ td += x.d; tt += x.t; });
-      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dist(td)) + ' · ' + esc(dur(tt)) + '</small></div>';
+      var td = 0, tt = 0, tl = 0;
+      g.items.forEach(function(x){ td += x.d; tt += x.t; tl += x.l || 0; });
+      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dist(td)) + ' · ' + esc(dur(tt)) + (tl > 0 ? ' · ' + esc(fl(tl)) : '') + '</small></div>';
       g.items.forEach(function(x){
         var avg = x.t > 0 ? x.d / (x.t / 1000) * 3.6 : 0;
         html += '<div class="s"><span class="h">' + hm(x.s) + (x === sess ? ' · en cours' : '') + '</span>' +
           '<span class="d">' + esc(dist(x.d)) + '</span>' +
-          '<span class="m">' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg)) + ' · max ' + esc(spd(x.v)) + '</span></div>';
+          '<span class="m">' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg)) + ' · max ' + esc(spd(x.v)) + (x.l > 0 ? ' · ' + esc(fl(x.l)) : '') + '</span></div>';
       });
     });
     html += '<button class="clr" id="histoClr" type="button">Tout effacer</button>';
@@ -674,7 +741,11 @@
     // Temps de roulage : on ne compte que le temps où l'on avance, hors pause
     if (!paused && kmh >= MIN_KMH && lastTs) {
       var dtm = p.timestamp - lastTs;
-      if (dtm > 0 && dtm < 5000) { rideMs += dtm; saveState(); showRide(); sessAdd(0, dtm, p.timestamp, kmh); }
+      if (dtm > 0 && dtm < 5000) {
+        var dl = 0;
+        if (unit === 'nm') { dl = fuelRate(kmh / 1.852) * fuelCal * dtm / 3600000; fuel += dl; showFuel(); }
+        rideMs += dtm; saveState(); showRide(); sessAdd(0, dtm, p.timestamp, kmh, dl);
+      }
     }
     lastTs = p.timestamp;
 
