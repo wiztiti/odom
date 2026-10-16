@@ -654,12 +654,15 @@
           '<span class="m">' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg)) + ' · max ' + esc(spd(x.v)) + (x.l > 0 ? ' · ' + esc(fl(x.l)) : '') + '</span></div>';
       });
     });
-    html += '<button class="clr" id="histoClr" type="button">Tout effacer</button>';
+    // Seules les sorties vélo (commencées en km/h) peuvent être effacées : les sorties bateau gardent
+    // leurs litres, qui servent au calibrage de la conso.
+    var nBike = hist.filter(function(x){ return x.u !== 'nm'; }).length;
+    if (nBike) html += '<button class="clr" id="histoClr" type="button">Effacer les sorties vélo</button>';
     elHistoList.innerHTML = html;
     var clr = $('histoClr'), armed = 0;
-    clr.addEventListener('click', function(){
-      if (!armed) { armed = 1; clr.textContent = 'Effacer tout l\'historique ? Toucher à nouveau'; setTimeout(function(){ armed = 0; clr.textContent = 'Tout effacer'; }, 5000); return; }
-      hist = []; saveHist(); renderHisto();
+    if (clr) clr.addEventListener('click', function(){
+      if (!armed) { armed = 1; clr.textContent = 'Effacer ' + nBike + ' sortie' + (nBike > 1 ? 's' : '') + ' vélo ? Toucher à nouveau'; setTimeout(function(){ armed = 0; clr.textContent = 'Effacer les sorties vélo'; }, 5000); return; }
+      hist = hist.filter(function(x){ return x.u === 'nm'; }); saveHist(); renderHisto();
     });
   }
   function openHisto(e){ e.stopPropagation(); renderHisto(); elHisto.hidden = false; elHisto.scrollTop = 0; }
