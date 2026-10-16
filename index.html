@@ -158,6 +158,9 @@
   #histo .s .h{font-weight:700;color:var(--cap)}
   #histo .s .d{text-align:right;font-weight:700}
   #histo .s .m{grid-column:1/-1;opacity:.75;font-size:.88em}
+  #histo .fill{margin-top:1vh;padding:.7em .9em;border:1.5px solid var(--fuel);border-radius:12px;display:flex;flex-direction:column;gap:.5em}
+  #histo .fill span{opacity:.9;font-size:.92em}
+  #histo .fill button{align-self:flex-start;color:var(--fuel);font-weight:700}
   #histo .empty{opacity:.7;margin-top:3vh}
   #histo .clr{align-self:flex-start;margin-top:2vh}
 
@@ -241,6 +244,7 @@
     <div id="histo" role="dialog" aria-label="Historique" hidden>
       <div class="wrap">
         <div class="top"><h2>Historique</h2><button id="histoClose" type="button">Fermer</button></div>
+        <div id="histoFill"></div>
         <div id="histoList"></div>
       </div>
     </div>
@@ -264,6 +268,7 @@
   var HIST_MAX = 2000;                // nombre maximum de séances conservées
   var KEY_M = 'compteur-velo-m';    // distance en mètres
   var KEY_L = 'compteur-velo-litres';   // litres estimés depuis le reset (mode knots)
+  var KEY_F = 'compteur-velo-plein';   // date (ms) du dernier « plein fait »
   var KEY_K = 'compteur-velo-calib';    // coefficient de calibrage de la conso
   var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
   var KEY_U = 'compteur-velo-unit'; // unité choisie : 'km' (km/h) ou 'nm' (nœuds / milles nautiques)
@@ -361,7 +366,7 @@
 
   /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
   var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0, sun = false,
-      hist = [], sess = null, speedMode = 'd1', fuel = 0, fuelCal = 1;
+      hist = [], sess = null, speedMode = 'd1', fuel = 0, fuelCal = 1, lastFill = 0;
   try {
     var sm = parseFloat(localStorage.getItem(KEY_M));
     if (isFinite(sm) && sm >= 0) odo = sm;
@@ -374,6 +379,8 @@
     if (sp === 'd2' || sp === 'plus') speedMode = sp;
     var sl = parseFloat(localStorage.getItem(KEY_L));
     if (isFinite(sl) && sl >= 0) fuel = sl;
+    var sf = parseFloat(localStorage.getItem(KEY_F));
+    if (isFinite(sf) && sf > 0) lastFill = sf;
     var sk = parseFloat(localStorage.getItem(KEY_K));
     if (isFinite(sk) && sk > 0.3 && sk < 3) fuelCal = sk;
     var sh = JSON.parse(localStorage.getItem(KEY_H) || '[]');
@@ -573,7 +580,59 @@
   }
   function fl(l){ return l.toFixed(1).replace('.', ',') + ' L'; }
   function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+  /* Calibrage par « Plein fait » : compare les litres estimés depuis le dernier plein aux litres réellement remis.
+     L'écart n'est appliqué qu'à moitié, pour qu'un plein approximatif ne fausse pas le coefficient. */
+  function fuelSince(){
+    var t = 0;
+    hist.forEach(function(x){ if (x.s >= lastFill) t += x.l || 0; });
+    if (sess && sess.s >= lastFill) t += sess.l || 0;
+    return t;
+  }
+  function renderFill(){
+    var el = $('histoFill'), h = '<div class="fill">';
+    if (unit !== 'nm') { el.innerHTML = ''; return; }   // réglage visible seulement en mode knots
+    if (!lastFill) {
+      h += '<span>Calibrage de la conso : après un plein, touchez « Plein fait » pour poser le point de départ.</span>';
+    } else {
+      h += '<span>Depuis le plein du ' + esc(new Date(lastFill).toLocaleDateString('fr-FR', { day:'numeric', month:'long' })) +
+           ' : ' + esc(fl(fuelSince())) + ' estimés (coefficient ×' + esc(String(Math.round(fuelCal * 100) / 100).replace('.', ',')) + ')</span>';
+    }
+    h += '<button id="fillBtn" type="button">Plein fait</button></div>';
+    el.innerHTML = h;
+    $('fillBtn').addEventListener('click', onFill);
+  }
+  function onFill(){
+    if (!lastFill) {
+      if (!window.confirm('Enregistrer ce plein comme point de départ ?\nLe calibrage se calculera au prochain plein.')) return;
+      lastFill = Date.now();
+      try { localStorage.setItem(KEY_F, String(lastFill)); } catch(e){}
+      renderFill(); return;
+    }
+    var counted = fuelSince();
+    if (counted < 3) {
+      window.alert('Seulement ' + fl(counted) + ' comptés depuis le dernier plein : trop peu pour calibrer.\nFaites d\'abord une sortie en knots.');
+      return;
+    }
+    var r = window.prompt('Litres réellement remis au plein (l\'appli en a compté ' + fl(counted).replace(' L','') + ') :', '');
+    if (r === null) return;
+    var real = parseFloat(String(r).replace(',', '.'));
+    if (!isFinite(real) || real <= 0) { window.alert('Valeur non valide.'); return; }
+    var ratio = real / counted;
+    if (ratio < 0.4 || ratio > 2.5) {
+      window.alert('Écart trop grand (' + fl(counted) + ' comptés, ' + fl(real) + ' remis) : il y a sûrement une erreur de saisie ou un plein manqué. Rien n\'est modifié.');
+      return;
+    }
+    var next = Math.min(2, Math.max(0.5, fuelCal * (1 + (ratio - 1) / 2)));   // moitié de l'écart seulement
+    var f2 = function(v){ return String(Math.round(v * 100) / 100).replace('.', ','); };
+    if (!window.confirm(fl(counted) + ' comptés, ' + fl(real) + ' réels.\nCoefficient : ×' + f2(fuelCal) + ' → ×' + f2(next) + ' (correction à moitié).\nAppliquer ?')) return;
+    fuelCal = next;
+    lastFill = Date.now();
+    try { localStorage.setItem(KEY_K, String(fuelCal)); localStorage.setItem(KEY_F, String(lastFill)); } catch(e){}
+    toast('Calibrage : ×' + f2(fuelCal));
+    renderFill();
+  }
   function renderHisto(){
+    renderFill();
     var all = hist.slice();
     if (sess && sess.d >= SESS_MIN_M) all.push(sess);
     if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune séance enregistrée pour l\'instant.</p>'; return; }
