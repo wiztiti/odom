@@ -132,6 +132,28 @@
   #help .c-trip{color:var(--km)}
   #help .c-time{color:var(--cap)}
   #help .hint{margin:0;font-size:min(3.8vw,2.3vh);opacity:.6}
+  #help li.histo{cursor:pointer;border:1.5px solid var(--ride);border-radius:12px;padding:1.4vh 3.5vw}
+  #help li.histo b{color:var(--ride)}
+
+  /* Historique : liste jour par jour, séance par séance */
+  #histo{
+    position:fixed;inset:0;z-index:11;box-sizing:border-box;overflow:auto;
+    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+    background:#000;color:var(--time);font-size:min(4.2vw,2.6vh);line-height:1.3;
+  }
+  #app.sun #histo{background:#FFFBEB}
+  #histo .wrap{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:1.6vh}
+  #histo .top{display:flex;align-items:center;justify-content:space-between}
+  #histo h2{margin:0;font-size:min(6vw,3.6vh);font-weight:800}
+  #histo button{font:inherit;font-size:.9em;color:inherit;background:none;border:1.5px solid currentColor;border-radius:10px;padding:.35em .8em;cursor:pointer;opacity:.85}
+  #histo .day{display:flex;justify-content:space-between;align-items:baseline;margin-top:1.6vh;padding-bottom:.3em;border-bottom:1px solid rgba(128,128,128,.5);font-weight:800;color:var(--km)}
+  #histo .day small{white-space:nowrap;margin-left:.8em;font-weight:600;opacity:.85;font-size:.85em}
+  #histo .s{display:grid;grid-template-columns:auto 1fr;gap:.1em 1em;padding:.5em 0;border-bottom:1px solid rgba(128,128,128,.2)}
+  #histo .s .h{font-weight:700;color:var(--cap)}
+  #histo .s .d{text-align:right;font-weight:700}
+  #histo .s .m{grid-column:1/-1;opacity:.75;font-size:.88em}
+  #histo .empty{opacity:.7;margin-top:3vh}
+  #histo .clr{align-self:flex-start;margin-top:2vh}
 
   #time{height:min(12vw,7.5vh);color:var(--time)}
   /* Cap sous l'heure : lettres + degrés, ou rien sans cap (la hauteur reste réservée), ou PAUSE */
@@ -195,12 +217,19 @@
       <div class="card">
         <h2>Aide</h2>
         <ul>
+          <li class="histo" id="histoBtn" role="button" tabindex="0"><b>Historique ›</b><span>Vos séances, jour par jour.</span></li>
           <li><b class="c-speed">Vitesse</b><span>Toucher : pause / reprise (reprise automatique au-dessus de 12 km/h).</span></li>
           <li><b class="c-speed">km/h</b><span>Toucher : passer en knots, et le trip en miles. Re-toucher pour revenir.</span></li>
           <li><b class="c-trip">Trip</b><span>Distance et temps de roulage. Toucher : remise à zéro, avec confirmation.</span></li>
           <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
         </ul>
         <p class="hint">Toucher l'écran pour fermer</p>
+      </div>
+    </div>
+    <div id="histo" role="dialog" aria-label="Historique" hidden>
+      <div class="wrap">
+        <div class="top"><h2>Historique</h2><button id="histoClose" type="button">Fermer</button></div>
+        <div id="histoList"></div>
       </div>
     </div>
   </main>
@@ -215,6 +244,11 @@
   var RESUME_MS = 5000;//   ...pendant 5 s relance le comptage tout seul (mode km/h seulement)
   var KEY_P = 'compteur-velo-pause';  // pause en cours : '1' ou '0'
   var KEY_S = 'compteur-velo-soleil'; // mode soleil : '1' ou '0'
+  var KEY_H = 'compteur-velo-histo';  // historique : liste des séances terminées
+  var KEY_C = 'compteur-velo-seance'; // séance en cours
+  var SESS_GAP_MS = 60 * 60 * 1000;   // 1 h sans rouler : la séance est terminée
+  var SESS_MIN_M = 100;               // une séance de moins de 100 m n'est pas enregistrée
+  var HIST_MAX = 2000;                // nombre maximum de séances conservées
   var KEY_M = 'compteur-velo-m';    // distance en mètres
   var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
   var KEY_U = 'compteur-velo-unit'; // unité choisie : 'km' (km/h) ou 'nm' (nœuds / milles nautiques)
@@ -301,7 +335,8 @@
   }
 
   /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
-  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0, sun = false;
+  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0, sun = false,
+      hist = [], sess = null;
   try {
     var sm = parseFloat(localStorage.getItem(KEY_M));
     if (isFinite(sm) && sm >= 0) odo = sm;
@@ -310,12 +345,36 @@
     if (localStorage.getItem(KEY_U) === 'nm') unit = 'nm';
     if (localStorage.getItem(KEY_P) === '1') paused = true;
     if (localStorage.getItem(KEY_S) === '1') sun = true;
+    var sh = JSON.parse(localStorage.getItem(KEY_H) || '[]');
+    if (Array.isArray(sh)) hist = sh.filter(function(x){ return x && typeof x.s === 'number' && typeof x.d === 'number'; });
+    var sc = JSON.parse(localStorage.getItem(KEY_C) || 'null');
+    if (sc && typeof sc.s === 'number' && typeof sc.e === 'number') sess = sc;
   } catch(e){}
   function saveState(){
     try {
       localStorage.setItem(KEY_M, String(odo));
       localStorage.setItem(KEY_T, String(rideMs));
     } catch(e){}
+  }
+  /* ---------- Séances : enregistrées automatiquement, indépendamment du trip ----------
+     Une séance démarre au premier mouvement. Elle se termine après 1 h sans rouler,
+     ou quand le trip est remis à zéro. Elle ne compte ni la pause ni l'arrêt. */
+  function saveSess(){ try { localStorage.setItem(KEY_C, JSON.stringify(sess)); } catch(e){} }
+  function saveHist(){ try { localStorage.setItem(KEY_H, JSON.stringify(hist)); } catch(e){} }
+  function sessAdd(dm, dms, ts, kmh){
+    if (!sess) sess = { s: ts, e: ts, d: 0, t: 0, v: 0, u: unit };   // u : unité utilisée au départ
+    sess.e = ts; sess.d += dm; sess.t += dms;
+    if (kmh > sess.v && kmh < 90) sess.v = kmh;                    // vitesse max, hors pics GPS aberrants
+    saveSess();
+  }
+  function closeSess(){
+    if (sess && sess.d >= SESS_MIN_M) {
+      hist.push(sess);
+      if (hist.length > HIST_MAX) hist.shift();
+      saveHist();
+    }
+    sess = null;
+    saveSess();
   }
   function showKm(){ setSeg(elKm, fmtKm(odo)); }
   function showRide(){ setSeg(elRide, fmtRide(rideMs)); }
@@ -355,6 +414,7 @@
   });
   elYes.addEventListener('click', function(){
     odo = 0; rideMs = 0; saveState(); showKm(); showRide(); closeConfirm();
+    closeSess();   // la remise à zéro termine la séance en cours
   });
   elNo.addEventListener('click', closeConfirm);
 
@@ -383,7 +443,65 @@
   /* ---------- Aide : « ? » en haut à droite ---------- */
   elHelpBtn.addEventListener('click', function(){ elHelp.hidden = false; });
   elHelp.addEventListener('click', function(){ elHelp.hidden = true; });
-  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') elHelp.hidden = true; });
+  var elHisto = $('histo'), elHistoList = $('histoList');
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { if (!elHisto.hidden) elHisto.hidden = true; else elHelp.hidden = true; }
+  });
+
+  /* ---------- Historique ---------- */
+  function p2(n){ return n < 10 ? '0' + n : '' + n; }
+  function dayKey(ts){ var d = new Date(ts); return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate()); }
+  function dayLabel(ts){
+    var s = new Date(ts).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function hm(ts){ var d = new Date(ts); return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
+  function dur(ms){
+    var t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+    return h ? h + ' h ' + p2(m) : m + ' min ' + p2(s);
+  }
+  function dist(m){
+    if (unit === 'nm') return (m / 1852).toFixed(2).replace('.', ',') + ' miles';
+    return m >= 1000 ? (m / 1000).toFixed(2).replace('.', ',') + ' km' : Math.round(m) + ' m';
+  }
+  function spd(kmh){
+    return unit === 'nm' ? (kmh / 1.852).toFixed(1).replace('.', ',') + ' knots' : kmh.toFixed(1).replace('.', ',') + ' km/h';
+  }
+  function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+  function renderHisto(){
+    var all = hist.slice();
+    if (sess && sess.d >= SESS_MIN_M) all.push(sess);
+    if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune séance enregistrée pour l\'instant.</p>'; return; }
+    all.sort(function(a, b){ return b.s - a.s; });
+    var html = '', cur = '', days = [];
+    all.forEach(function(x){
+      var k = dayKey(x.s);
+      if (k !== cur) { cur = k; days.push({ ts: x.s, items: [] }); }
+      days[days.length - 1].items.push(x);
+    });
+    days.forEach(function(g){
+      var td = 0, tt = 0;
+      g.items.forEach(function(x){ td += x.d; tt += x.t; });
+      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dist(td)) + ' · ' + esc(dur(tt)) + '</small></div>';
+      g.items.forEach(function(x){
+        var avg = x.t > 0 ? x.d / (x.t / 1000) * 3.6 : 0;
+        html += '<div class="s"><span class="h">' + hm(x.s) + (x === sess ? ' · en cours' : '') + '</span>' +
+          '<span class="d">' + esc(dist(x.d)) + '</span>' +
+          '<span class="m">' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg)) + ' · max ' + esc(spd(x.v)) + '</span></div>';
+      });
+    });
+    html += '<button class="clr" id="histoClr" type="button">Tout effacer</button>';
+    elHistoList.innerHTML = html;
+    var clr = $('histoClr'), armed = 0;
+    clr.addEventListener('click', function(){
+      if (!armed) { armed = 1; clr.textContent = 'Effacer tout l\'historique ? Toucher à nouveau'; setTimeout(function(){ armed = 0; clr.textContent = 'Tout effacer'; }, 5000); return; }
+      hist = []; saveHist(); renderHisto();
+    });
+  }
+  function openHisto(e){ e.stopPropagation(); renderHisto(); elHisto.hidden = false; elHisto.scrollTop = 0; }
+  $('histoBtn').addEventListener('click', openHisto);
+  $('histoBtn').addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHisto(e); } });
+  $('histoClose').addEventListener('click', function(){ elHisto.hidden = true; });
 
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
@@ -401,6 +519,7 @@
     } else if (!lastFix && !denied) {
       setStatus('Recherche du GPS… ' + Math.round((now - startedAt) / 1000) + ' s');
     }
+    if (sess && now - sess.e > SESS_GAP_MS) closeSess();   // plus d'une heure sans rouler : séance terminée
     // Chien de garde : si le GPS ne donne plus rien pendant 10 s, on relance le suivi
     if (!denied && lastCall && now - Math.max(lastCall, restartAt) > 10000) startWatch();
   }
@@ -495,6 +614,7 @@
           anchor = pt(p);                                   // saut GPS aberrant : on repart d'ici
         } else if (v * 3.6 >= MIN_KMH && d >= thr) {
           odo += d; anchor = pt(p); saveState(); showKm();
+          sessAdd(d, 0, p.timestamp, 0);
         }
       } else {
         anchor = pt(p);
@@ -516,7 +636,7 @@
     // Temps de roulage : on ne compte que le temps où l'on avance, hors pause
     if (!paused && kmh >= MIN_KMH && lastTs) {
       var dtm = p.timestamp - lastTs;
-      if (dtm > 0 && dtm < 5000) { rideMs += dtm; saveState(); showRide(); }
+      if (dtm > 0 && dtm < 5000) { rideMs += dtm; saveState(); showRide(); sessAdd(0, dtm, p.timestamp, kmh); }
     }
     lastTs = p.timestamp;
 
