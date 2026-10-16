@@ -153,7 +153,8 @@
   #histo h2{margin:0;font-size:min(6vw,3.6vh);font-weight:800}
   #histo button{font:inherit;font-size:.9em;color:inherit;background:none;border:1.5px solid currentColor;border-radius:10px;padding:.35em .8em;cursor:pointer;opacity:.85}
   #histo .day{display:flex;justify-content:space-between;align-items:baseline;margin-top:1.6vh;padding-bottom:.3em;border-bottom:1px solid rgba(128,128,128,.5);font-weight:800;color:var(--km)}
-  #histo .day small{white-space:nowrap;margin-left:.8em;font-weight:600;opacity:.85;font-size:.85em}
+  #histo .day{flex-wrap:wrap}
+  #histo .day small{width:100%;margin-top:.15em;font-weight:600;opacity:.85;font-size:.85em}
   #histo .s{display:grid;grid-template-columns:auto 1fr;gap:.1em 1em;padding:.5em 0;border-bottom:1px solid rgba(128,128,128,.2)}
   #histo .s .h{font-weight:700;color:var(--cap)}
   #histo .s .d{text-align:right;font-weight:700}
@@ -571,12 +572,12 @@
     var t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
     return h ? h + ' h ' + p2(m) : m + ' min ' + p2(s);
   }
-  function dist(m){
-    if (unit === 'nm') return (m / 1852).toFixed(2).replace('.', ',') + ' miles';
+  function dist(m, u){
+    if ((u || unit) === 'nm') return (m / 1852).toFixed(2).replace('.', ',') + ' miles';
     return m >= 1000 ? (m / 1000).toFixed(2).replace('.', ',') + ' km' : Math.round(m) + ' m';
   }
-  function spd(kmh){
-    return unit === 'nm' ? (kmh / 1.852).toFixed(1).replace('.', ',') + ' knots' : kmh.toFixed(1).replace('.', ',') + ' km/h';
+  function spd(kmh, u){
+    return (u || unit) === 'nm' ? (kmh / 1.852).toFixed(1).replace('.', ',') + ' knots' : kmh.toFixed(1).replace('.', ',') + ' km/h';
   }
   function fl(l){ return l.toFixed(1).replace('.', ',') + ' L'; }
   function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
@@ -644,14 +645,17 @@
       days[days.length - 1].items.push(x);
     });
     days.forEach(function(g){
-      var td = 0, tt = 0, tl = 0;
-      g.items.forEach(function(x){ td += x.d; tt += x.t; tl += x.l || 0; });
-      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dist(td)) + ' · ' + esc(dur(tt)) + (tl > 0 ? ' · ' + esc(fl(tl)) : '') + '</small></div>';
+      var tk = 0, tn = 0, tt = 0, tl = 0;   // distances séparées : km (vélo) et miles (bateau)
+      g.items.forEach(function(x){ if (x.u === 'nm') tn += x.d; else tk += x.d; tt += x.t; tl += x.l || 0; });
+      var dd = [];
+      if (tk > 0) dd.push(dist(tk, 'km'));
+      if (tn > 0) dd.push(dist(tn, 'nm'));
+      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dd.join(' · ')) + ' · ' + esc(dur(tt)) + (tl > 0 ? ' · ' + esc(fl(tl)) : '') + '</small></div>';
       g.items.forEach(function(x){
         var avg = x.t > 0 ? x.d / (x.t / 1000) * 3.6 : 0;
         html += '<div class="s"><span class="h">' + hm(x.s) + (x === sess ? ' · en cours' : '') + '</span>' +
-          '<span class="d">' + esc(dist(x.d)) + '</span>' +
-          '<span class="m">' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg)) + ' · max ' + esc(spd(x.v)) + (x.l > 0 ? ' · ' + esc(fl(x.l)) : '') + '</span></div>';
+          '<span class="d">' + esc(dist(x.d, x.u)) + '</span>' +
+          '<span class="m">' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg, x.u)) + ' · max ' + esc(spd(x.v, x.u)) + (x.l > 0 ? ' · ' + esc(fl(x.l)) : '') + '</span></div>';
       });
     });
     // Seules les sorties vélo (commencées en km/h) peuvent être effacées : les sorties bateau gardent
