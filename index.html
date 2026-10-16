@@ -19,6 +19,9 @@
     --cap:#FFE45C;     /* jaune clair : cap, très lumineux en plein soleil */
     --ride:#FFB8F0;    /* rose clair : temps de roulage, lisible en plein soleil */
     --paused:#7c8890;  /* gris : valeurs figées pendant la pause */
+    --panel-speed:#D6EEFF;   /* cadrans du mode soleil : bleu très clair, */
+    --panel-trip:#D8F6DF;    /*   vert très clair, */
+    --panel-clock:#FFF3BF;   /*   jaune très clair */
     --sp-h:min(29vw,18vh);   /* hauteur des chiffres de la vitesse */
     --dim:#9a9a9a;
   }
@@ -87,6 +90,22 @@
   #app.paused #speed,#app.paused #km,#app.paused #ride{color:var(--paused)}
   #speed{cursor:pointer}
 
+  /* Mode soleil (appui sur l'heure) : trois cadrans clairs derrière les blocs, chiffres foncés.
+     Les cadrans sont dessinés derrière le contenu : aucun affichage ne bouge. */
+  .panel{position:relative;isolation:isolate}
+  #app.sun .panel::before{
+    content:"";position:absolute;inset:-2.4vh 4vw;border-radius:24px;background:var(--panel);z-index:-1;
+  }
+  #rowSpeed{--panel:var(--panel-speed)}
+  .trip{--panel:var(--panel-trip)}
+  .clock{--panel:var(--panel-clock);cursor:pointer}
+  #app.sun{--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--paused:#56626B}
+  #app.sun .seg .off{opacity:.13}
+  #app.sun #confirm{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
+  #app.sun #confirm p{color:var(--km)}
+  #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
+  #app.sun #no{color:#101010;border-color:rgba(16,16,16,.55)}
+
   #time{height:min(12vw,7.5vh);color:var(--time)}
   /* Cap sous l'heure : lettres + degrés, ou rien sans cap (la hauteur reste réservée), ou PAUSE */
   #head{
@@ -108,12 +127,12 @@
   <div id="status" role="status">Recherche du GPS…</div>
 
   <main id="app">
-    <section class="row" id="rowSpeed">
+    <section class="row panel" id="rowSpeed">
       <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
       <button id="u1" class="side" type="button" aria-label="Changer d'unité : km/h ou nœuds">km/h</button>
     </section>
 
-    <div class="trip" id="trip" role="button" tabindex="0" aria-label="Trip : toucher pour remettre à zéro">
+    <div class="trip panel" id="trip" role="button" tabindex="0" aria-label="Trip : toucher pour remettre à zéro">
       <section class="row">
         <svg id="km" class="num seg" role="img" aria-label="Distance"></svg>
         <span id="u2" class="side"><small>trip</small><span id="u2u">m</span></span>
@@ -132,7 +151,7 @@
       </div>
     </div>
 
-    <div class="clock">
+    <div class="clock panel" id="clock">
       <section class="row">
         <svg id="time" class="num seg" role="img" aria-label="Heure"></svg>
       </section>
@@ -155,6 +174,7 @@
   var RESUME_KMH = 12; // km/h : en pause, rouler au-dessus de cette vitesse...
   var RESUME_MS = 5000;//   ...pendant 5 s relance le comptage tout seul (mode km/h seulement)
   var KEY_P = 'compteur-velo-pause';  // pause en cours : '1' ou '0'
+  var KEY_S = 'compteur-velo-soleil'; // mode soleil : '1' ou '0'
   var KEY_M = 'compteur-velo-m';    // distance en mètres
   var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
   var KEY_U = 'compteur-velo-unit'; // unité choisie : 'km' (km/h) ou 'nm' (nœuds / milles nautiques)
@@ -164,7 +184,7 @@
       elHead = $('head'), elStatus = $('status'),
       elU1 = $('u1'), elU2u = $('u2u'),
       elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no'),
-      elApp = $('app'), elRowSpeed = $('rowSpeed'),
+      elApp = $('app'), elRowSpeed = $('rowSpeed'), elClock = $('clock'),
       elHmsg = $('hmsg'), elHval = $('hval'), elHl = $('hl'), elHd = $('hd');
 
   /* ---------- Affichage à segments (7 segments) ---------- */
@@ -240,7 +260,7 @@
   }
 
   /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
-  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0;
+  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0, sun = false;
   try {
     var sm = parseFloat(localStorage.getItem(KEY_M));
     if (isFinite(sm) && sm >= 0) odo = sm;
@@ -248,6 +268,7 @@
     if (isFinite(st) && st >= 0) rideMs = st;
     if (localStorage.getItem(KEY_U) === 'nm') unit = 'nm';
     if (localStorage.getItem(KEY_P) === '1') paused = true;
+    if (localStorage.getItem(KEY_S) === '1') sun = true;
   } catch(e){}
   function saveState(){
     try {
@@ -309,12 +330,19 @@
   });
   if (paused) elApp.classList.add('paused');
 
+  /* ---------- Mode soleil : appui sur l'heure ---------- */
+  function setSun(v){
+    sun = v;
+    if (v) elApp.classList.add('sun'); else elApp.classList.remove('sun');
+    try { localStorage.setItem(KEY_S, v ? '1' : '0'); } catch(e){}
+  }
+  elClock.addEventListener('click', function(){ setSun(!sun); });
+  if (sun) elApp.classList.add('sun');
+
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
   var lastFix = 0;
-  var VERSION = 'v7';
-  var lastCall = 0, fixCount = 0, lastAcc = null, lastSpd = null, lastErr = '';
-  var debug = false, denied = false, watchId = null, restartAt = 0, startedAt = Date.now();
+  var lastCall = 0, denied = false, watchId = null, restartAt = 0, startedAt = Date.now();
   function tick(){
     var d = new Date();
     var t = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
@@ -329,20 +357,7 @@
     }
     // Chien de garde : si le GPS ne donne plus rien pendant 10 s, on relance le suivi
     if (!denied && lastCall && now - Math.max(lastCall, restartAt) > 10000) startWatch();
-    if (debug) {
-      setStatus(VERSION + (paused ? ' · PAUSE' : '') + ' · fix ' + fixCount +
-        ' · préc ' + (lastAcc === null ? '–' : Math.round(lastAcc) + ' m') +
-        ' · vit GPS ' + (lastSpd === null ? 'aucune' : lastSpd.toFixed(1) + ' m/s') +
-        ' · erreur ' + (lastErr || '–') +
-        ' · dernier ' + (lastCall ? Math.round((now - lastCall) / 1000) + ' s' : '–'));
-    }
   }
-  // Un appui sur l'heure affiche ou masque les infos de diagnostic GPS
-  elTime.addEventListener('click', function(){
-    debug = !debug;
-    if (!debug) setStatus('');
-    tick();
-  });
   setInterval(tick, 1000);
   tick();
 
@@ -403,8 +418,7 @@
 
   function onPos(p){
     var c = p.coords;
-    lastCall = Date.now(); fixCount++; lastAcc = c.accuracy;
-    lastSpd = (typeof c.speed === 'number' && isFinite(c.speed)) ? c.speed : null;
+    lastCall = Date.now();
     var accOk = c.accuracy <= MAX_ACC;
     var hasSpeed = typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0;   // vitesse mesurée par le GPS (m/s)
 
@@ -475,7 +489,6 @@
   }
 
   function onErr(e){
-    lastErr = e ? e.code : '?';
     if (e && e.code === 1) {
       denied = true;
       setStatus('Autorisez la localisation');
