@@ -162,6 +162,21 @@
   #histo .fill{margin-top:1vh;padding:.7em .9em;border:1.5px solid var(--fuel);border-radius:12px;display:flex;flex-direction:column;gap:.5em}
   #histo .fill span{opacity:.9;font-size:.92em}
   #histo .fill button{align-self:flex-start;color:var(--fuel);font-weight:700}
+  #histo .acts{display:flex;gap:.5em}
+  #histo .ck{display:none;width:1.05em;height:1.05em;margin-right:.55em;border:2px solid currentColor;border-radius:.25em;vertical-align:-.12em;box-sizing:border-box;position:relative}
+  #histo.sel .ck{display:inline-block}
+  #histo.sel .s{cursor:pointer}
+  #histo .s.off{opacity:.45;cursor:default}
+  #histo .s.on .ck{background:var(--km);border-color:var(--km)}
+  #histo .s.on .ck::after{content:"";position:absolute;left:.28em;top:.05em;width:.28em;height:.55em;border:solid #000;border-width:0 .17em .17em 0;transform:rotate(45deg)}
+  #app.sun #histo .s.on .ck::after{border-color:#fff}
+  #histo .s.on{background:rgba(128,128,128,.14)}
+  #histoBar{position:sticky;bottom:0;display:flex;gap:.6em;flex-wrap:wrap;padding:.8em 0;margin-top:1.2vh;background:#000;border-top:1px solid rgba(128,128,128,.5)}
+  #app.sun #histoBar{background:#FFFBEB}
+  #histoBar span{flex:1 0 100%;font-size:.88em;opacity:.8}
+  #histoBar button:disabled{opacity:.3;cursor:default}
+  #histoBar .danger{color:#FF6B6B;font-weight:700}
+  #app.sun #histoBar .danger{color:#B00020}
   #histo .empty{opacity:.7;margin-top:3vh}
   #histo .clr{align-self:flex-start;margin-top:2vh}
 
@@ -244,9 +259,10 @@
     <div id="toast" role="status" hidden></div>
     <div id="histo" role="dialog" aria-label="Historique" hidden>
       <div class="wrap">
-        <div class="top"><h2>Historique</h2><button id="histoClose" type="button">Fermer</button></div>
+        <div class="top"><h2>Historique</h2><div class="acts"><button id="histoSel" type="button">Sélectionner</button><button id="histoClose" type="button">Fermer</button></div></div>
         <div id="histoFill"></div>
         <div id="histoList"></div>
+        <div id="histoBar" hidden></div>
       </div>
     </div>
   </main>
@@ -569,8 +585,7 @@
   }
   function hm(ts){ var d = new Date(ts); return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
   function dur(ms){
-    var t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
-    return h ? h + ' h ' + p2(m) : m + ' min ' + p2(s);
+    return fmtRide(Math.round(ms / 1000) * 1000);   // h:mm:ss, comme le temps de roulage de l'écran principal
   }
   function dist(m, u){
     if ((u || unit) === 'nm') return (m / 1852).toFixed(2).replace('.', ',') + ' miles';
@@ -632,11 +647,75 @@
     toast('Calibrage : ×' + f2(fuelCal));
     renderFill();
   }
+  /* Sélection : bouton « Sélectionner » -> cases à cocher, puis Supprimer / Fusionner (même type seulement) */
+  var selMode = false, picked = [], rows = [];
+  function isBoat(x){ return x.u === 'nm'; }
+  function setSelMode(v){
+    selMode = v; picked = [];
+    elHisto.classList.toggle('sel', v);
+    $('histoSel').textContent = v ? 'Terminer' : 'Sélectionner';
+    renderHisto();
+  }
+  function renderBar(){
+    var bar = $('histoBar');
+    if (!selMode) { bar.hidden = true; return; }
+    bar.hidden = false;
+    var n = picked.length, boats = picked.filter(isBoat).length;
+    var mixed = boats > 0 && boats < n;
+    var note = n ? n + ' séance' + (n > 1 ? 's' : '') + ' sélectionnée' + (n > 1 ? 's' : '') +
+                   (mixed ? ' — vélo et bateau ne peuvent pas être fusionnés' : '')
+                 : 'Touchez les séances à sélectionner';
+    bar.innerHTML = '<span>' + esc(note) + '</span>' +
+      '<button id="barAll" type="button">Tout</button>' +
+      '<button id="barMerge" type="button"' + (n < 2 || mixed ? ' disabled' : '') + '>Fusionner</button>' +
+      '<button id="barDel" class="danger" type="button"' + (n < 1 ? ' disabled' : '') + '>Supprimer</button>';
+    $('barAll').addEventListener('click', function(){
+      var sel = rows.filter(function(x){ return x !== sess; });
+      picked = picked.length === sel.length ? [] : sel.slice();
+      renderHisto();
+    });
+    $('barMerge').addEventListener('click', doMerge);
+    $('barDel').addEventListener('click', doDelete);
+  }
+  function affectsFuel(list){   // sorties bateau avec litres comptés dans le calibrage en cours
+    return !!lastFill && list.some(function(x){ return isBoat(x) && (x.l || 0) > 0 && x.s >= lastFill; });
+  }
+  function doDelete(){
+    var n = picked.length; if (!n) return;
+    var msg = 'Supprimer ' + n + ' séance' + (n > 1 ? 's' : '') + ' ? C\'est définitif.';
+    if (affectsFuel(picked)) msg += '\n\nAttention : les litres de sorties bateau supprimées ne compteront plus pour le calibrage du prochain plein.';
+    if (!window.confirm(msg)) return;
+    hist = hist.filter(function(x){ return picked.indexOf(x) < 0; });
+    saveHist(); setSelMode(false);
+  }
+  function doMerge(){
+    var n = picked.length; if (n < 2) return;
+    var boat = isBoat(picked[0]);
+    if (picked.some(function(x){ return isBoat(x) !== boat; })) return;
+    var m = { s: Infinity, e: 0, d: 0, t: 0, v: 0, u: boat ? 'nm' : 'km' }, l = 0;
+    picked.forEach(function(x){
+      if (x.s < m.s) m.s = x.s;
+      if (x.e > m.e) m.e = x.e;
+      m.d += x.d; m.t += x.t; if (x.v > m.v) m.v = x.v; l += x.l || 0;
+    });
+    if (l > 0) m.l = l;
+    var msg = 'Fusionner ' + n + ' séances en une seule ?\nDe ' + hm(m.s) + ' à ' + hm(m.e) + ' : ' + dist(m.d, m.u) + ', durée ' + dur(m.t) + '.\nLes séances d\'origine sont remplacées.';
+    var firstStart = lastFill && picked.some(function(x){ return x.s < lastFill; }) && picked.some(function(x){ return x.s >= lastFill; });
+    if (boat && l > 0 && firstStart) msg += '\n\nAttention : cette fusion enjambe le dernier plein ; tous ses litres seront comptés depuis le prochain plein.';
+    if (!window.confirm(msg)) return;
+    hist = hist.filter(function(x){ return picked.indexOf(x) < 0; });
+    hist.push(m);
+    hist.sort(function(a, b){ return a.s - b.s; });
+    saveHist(); setSelMode(false);
+  }
   function renderHisto(){
     renderFill();
     var all = hist.slice();
     if (sess && sess.d >= SESS_MIN_M) all.push(sess);
-    if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune séance enregistrée pour l\'instant.</p>'; return; }
+    rows = all;
+    picked = picked.filter(function(x){ return hist.indexOf(x) >= 0; });
+    $('histoSel').hidden = !hist.length;
+    if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune séance enregistrée pour l\'instant.</p>'; renderBar(); return; }
     all.sort(function(a, b){ return b.s - a.s; });
     var html = '', cur = '', days = [];
     all.forEach(function(x){
@@ -653,26 +732,30 @@
       html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dd.join(' · ')) + ' · ' + esc(dur(tt)) + (tl > 0 ? ' · ' + esc(fl(tl)) : '') + '</small></div>';
       g.items.forEach(function(x){
         var avg = x.t > 0 ? x.d / (x.t / 1000) * 3.6 : 0;
-        html += '<div class="s"><span class="h">' + hm(x.s) + (x === sess ? ' · en cours' : '') + '</span>' +
+        var cls = 's' + (x === sess ? ' off' : '') + (picked.indexOf(x) >= 0 ? ' on' : '');
+        html += '<div class="' + cls + '" data-i="' + all.indexOf(x) + '"><span class="h"><i class="ck"></i>' + hm(x.s) + (x === sess ? ' → en cours' : ' → ' + hm(x.e)) + '</span>' +
           '<span class="d">' + esc(dist(x.d, x.u)) + '</span>' +
-          '<span class="m">' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg, x.u)) + ' · max ' + esc(spd(x.v, x.u)) + (x.l > 0 ? ' · ' + esc(fl(x.l)) : '') + '</span></div>';
+          '<span class="m">durée ' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg, x.u)) + ' · max ' + esc(spd(x.v, x.u)) + (x.l > 0 ? ' · ' + esc(fl(x.l)) : '') + '</span></div>';
       });
     });
-    // Seules les sorties vélo (commencées en km/h) peuvent être effacées : les sorties bateau gardent
-    // leurs litres, qui servent au calibrage de la conso.
-    var nBike = hist.filter(function(x){ return x.u !== 'nm'; }).length;
-    if (nBike) html += '<button class="clr" id="histoClr" type="button">Effacer les sorties vélo</button>';
     elHistoList.innerHTML = html;
-    var clr = $('histoClr'), armed = 0;
-    if (clr) clr.addEventListener('click', function(){
-      if (!armed) { armed = 1; clr.textContent = 'Effacer ' + nBike + ' sortie' + (nBike > 1 ? 's' : '') + ' vélo ? Toucher à nouveau'; setTimeout(function(){ armed = 0; clr.textContent = 'Effacer les sorties vélo'; }, 5000); return; }
-      hist = hist.filter(function(x){ return x.u === 'nm'; }); saveHist(); renderHisto();
-    });
+    renderBar();
   }
-  function openHisto(e){ e.stopPropagation(); renderHisto(); elHisto.hidden = false; elHisto.scrollTop = 0; }
+  elHistoList.addEventListener('click', function(e){
+    if (!selMode) return;
+    var row = e.target.closest ? e.target.closest('.s') : null;
+    if (!row) return;
+    var x = rows[+row.getAttribute('data-i')];
+    if (!x || x === sess) return;          // la séance en cours n'est pas sélectionnable
+    var k = picked.indexOf(x);
+    if (k >= 0) picked.splice(k, 1); else picked.push(x);
+    renderHisto();
+  });
+  function openHisto(e){ e.stopPropagation(); selMode = false; picked = []; elHisto.classList.remove('sel'); $('histoSel').textContent = 'Sélectionner'; renderHisto(); elHisto.hidden = false; elHisto.scrollTop = 0; }
   $('histoBtn').addEventListener('click', openHisto);
   $('histoBtn').addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHisto(e); } });
   $('histoClose').addEventListener('click', function(){ elHisto.hidden = true; });
+  $('histoSel').addEventListener('click', function(){ setSelMode(!selMode); });
 
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
