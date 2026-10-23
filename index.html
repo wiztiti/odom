@@ -92,6 +92,7 @@
   #rowFuel{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   /* Pause manuelle : vitesse, distance et temps passent en gris, "PAUSE" remplace le cap */
   #app.paused #speed,#app.paused #km,#app.paused #ride,#app.paused #fuel{color:var(--paused)}
+  #app.idle #km,#app.idle #ride,#app.idle #fuel{color:var(--paused)}   /* arrêté : compteurs en gris, la vitesse reste en couleur */
   #speed{cursor:pointer}
 
   /* Mode soleil (appui sur l'heure) : trois cadrans clairs derrière les blocs, chiffres foncés.
@@ -101,14 +102,14 @@
     content:"";position:absolute;inset:-2.4vh 4vw;border-radius:24px;background:var(--panel);z-index:-1;
   }
   #rowSpeed{--panel:var(--panel-speed);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
-  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 84px);transform:translateX(-50%);z-index:20;
+  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 66px + min(13vw,6.2vh) + 28px);transform:translateX(-50%);z-index:20;
     background:#222;color:#fff;border:1px solid #666;border-radius:10px;padding:.55em 1em;font-size:min(4vw,2.4vh);white-space:nowrap}
   #app.sun #toast{background:#fff;color:#000;border-color:#000}
   .trip{--panel:var(--panel-trip)}
   .clock{--panel:var(--panel-clock);cursor:pointer}
   #app.sun{--dial-bg:#FFFBEB;--dial-ink:#101010;--dial-rim:#6b5a20;--lubber:#C4001A;--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
   #app.sun .seg .off{opacity:.045}
-  #app.sun .clock::before{inset:-2.4vh 4vw -0.9vh}   /* cadran de l'heure un peu moins haut en bas, pour laisser la place aux boutons */
+  #app.sun .clock::before{inset:-1.2vh 4vw -0.45vh}   /* cadran de l'heure un peu moins haut en bas, pour laisser la place aux boutons */
   #app.sun #confirm{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
   #app.sun #confirm p{color:var(--km)}
   #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
@@ -117,12 +118,14 @@
   /* Compas du bateau (onglet Bateau) : rose classique qui tourne derrière une ligne de foi fixe ; vitesse au centre */
   #app.boat{--D:min(92vw,42vh);--sp-h:calc(var(--D) * .26);
     padding-bottom:calc(66px + min(13vw,6.2vh) + 18px)}   /* la place des boutons et de la barre d'onglets est réservée */
+  #topBlock{width:100%}
   #dial,#dialHd,#timeB{display:none}
   #app.boat #dial{display:block;grid-area:1/1;width:var(--D);height:var(--D)}
-  #app.boat #dialHd{display:block;position:absolute;z-index:3;left:50%;top:calc(var(--D) * .215);transform:translateX(-50%);height:calc(var(--D) * .085);color:var(--cap)}
+  #app.boat #dialHd{display:block;position:absolute;z-index:3;left:50%;top:calc(var(--D) * .205);transform:translateX(-50%);height:calc(var(--D) * .115);color:var(--cap);
+    background:var(--dial-bg);box-shadow:0 0 0 calc(var(--D) * .012) var(--dial-bg),0 0 calc(var(--D) * .03) calc(var(--D) * .018) var(--dial-bg)}   /* fenêtre du cap : masque les lettres qui passent derrière */
   #app.boat #timeB{display:block;position:fixed;z-index:4;left:calc(env(safe-area-inset-left) + 4vw);top:calc(env(safe-area-inset-top) + 1.6vh);height:min(7.4vw,3.6vh);color:#fff}
   #app.boat #topBlock{position:relative;display:grid;place-items:center;width:var(--D);height:var(--D)}
-  #app.boat #rowSpeed{grid-area:1/1;z-index:2;width:auto;display:flex;flex-direction:column;align-items:center;gap:calc(var(--D) * .025);margin-top:calc(var(--D) * .03)}
+  #app.boat #rowSpeed{grid-area:1/1;z-index:2;width:auto;display:flex;flex-direction:column;align-items:center;gap:calc(var(--D) * .025);margin-top:calc(var(--D) * .085)}
   #app.boat #rowSpeed::before{display:none}
   #app.boat #u1{transform:none;margin:0;padding:0;align-self:auto;font-size:calc(var(--D) * .058)}
   #app.boat .clock{display:none}
@@ -150,10 +153,10 @@
   #ctl button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   #ctl svg{width:44%;height:62%;fill:currentColor}
   #ctl .ip{display:none}
-  #app.paused #ctl .ip{display:block}
-  #app.paused #ctl .ii{display:none}
+  #app.paused #ctl .ip,#app.idle #ctl .ip{display:block}
+  #app.paused #ctl .ii,#app.idle #ctl .ii{display:none}
   #bPlay{--c:#39FF7A}                    /* vert : en marche (⏸) */
-  #app.paused #bPlay{--c:#FF9F1C}        /* orange : en pause (▶), distinct du soleil */
+  #app.paused #bPlay,#app.idle #bPlay{--c:#FF9F1C}        /* orange : en pause (▶), distinct du soleil */
   #bStop{--c:#FF5A5A}                    /* rouge : arrêt de séance */
   #bReset{--c:#4FC3FF}                   /* bleu : remise à zéro */
   #bSun{--c:#FFE45C}                     /* jaune : mode soleil */
@@ -161,7 +164,7 @@
   #bSun[aria-pressed=true]{background:#000;color:var(--c)}   /* mode soleil actif : bouton inversé */
   #app.sun #ctl button{color:#fff}
   #app.sun #bPlay{--c:#0B6B2C}
-  #app.sun.paused #bPlay{--c:#8A5A00}
+  #app.sun.paused #bPlay,#app.sun.idle #bPlay{--c:#8A5A00}
   #app.sun #bStop{--c:#B00020}
   #app.sun #bReset{--c:#0A4C8A}
   #app.sun #bSun{--c:#B07A00}
@@ -349,7 +352,7 @@
           <h3>Aide</h3>
           <ul>
             <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte. Bateau : compas à rose tournante ; le cap vient du GPS (route sur le fond), il se fige à l'arrêt.</span></li>
-            <li><b class="c-speed">Boutons ⏸ ■ ↺ ☀</b><span>⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, qui est rangée dans l'historique (le trip reste). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
+            <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps, litres et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
             <li><b class="c-trip">Litres (bateau)</b><span>Consommation estimée. Appui long : calibrage (ou dans Réglages).</span></li>
             <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
           </ul>
@@ -400,7 +403,7 @@
   var KEY_ST = 'compteur-velo-compteurs';  // compteurs séparés : { bike:{m,t}, boat:{m,t,l} }
   var KEY_TAB = 'compteur-velo-onglet';    // dernière activité affichée : 'bike' ou 'boat'
   var KEY_PM = 'compteur-velo-precisions'; // précision de la vitesse par activité
-  var KEY_PZ = 'compteur-velo-pauses';     // pause manuelle par activité
+  var KEY_RS = 'compteur-velo-etat';       // état du comptage : 'idle' (arrêté), 'run' (en marche), 'pause'
 
   var $ = function(id){ return document.getElementById(id); };
   var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elFuel = $('fuel'), elRowFuel = $('rowFuel'), elTime = $('time'), elTimeB = $('timeB'), elDial = $('dial'), elDialHd = $('dialHd'),
@@ -486,7 +489,7 @@
     return v.toFixed(1);
   }
   // Trip : en mètres (entiers) en mode km/h, en milles nautiques (1 mille = 1 852 m) en mode nœuds
-  function fmtKm(m){ return unit === 'nm' ? (m / 1852).toFixed(2) : String(Math.round(m)); }
+  function fmtKm(m){ return unit === 'nm' ? (m / 1852).toFixed(2) : (Math.round(m / 10) * 10 / 1000).toFixed(3); }   // vélo : km à 3 décimales, arrondi à 10 m
   function fmtRide(ms){
     var s = Math.floor(ms / 1000);
     var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -498,7 +501,7 @@
   var tab = 'bike';                 // onglet affiché : 'bike', 'boat' ou 'menu' (pendant le menu, la dernière activité continue de compter)
   var unit = 'km';                  // dérivé de act : 'km' (km/h, mètres) ou 'nm' (nœuds, milles)
   var store = { bike: { m: 0, t: 0 }, boat: { m: 0, t: 0, l: 0 } };   // compteurs séparés
-  var modes = { bike: 'd2', boat: 'd1' }, pausedBy = { bike: false, boat: false };
+  var modes = { bike: 'd2', boat: 'd1' }, runState = 'idle';   // le comptage ne démarre que par le bouton ▶
   var odo = 0, rideMs = 0, fuel = 0;                                    // copie des compteurs de l'activité affichée
   var lastKmh = 0, paused = false, fastSince = 0, sun = false, speedMode = 'd2',
       hist = [], sess = null, fuelCal = 1, lastFill = 0;
@@ -520,9 +523,8 @@
     var pm = JSON.parse(localStorage.getItem(KEY_PM) || 'null');
     if (pm && okm(pm.bike) && okm(pm.boat)) modes = pm;
     else { var oldm = localStorage.getItem(KEY_PR); if (okm(oldm)) modes.boat = oldm; }   // le bateau garde l'ancien réglage, le vélo passe à 0,2
-    var pz = JSON.parse(localStorage.getItem(KEY_PZ) || 'null');
-    if (pz && typeof pz === 'object') { pausedBy.bike = !!pz.bike; pausedBy.boat = !!pz.boat; }
-    else if (localStorage.getItem(KEY_P) === '1') pausedBy[legacyAct] = true;
+    var rs = localStorage.getItem(KEY_RS);
+    if (rs === 'run' || rs === 'pause') runState = rs;
     if (localStorage.getItem(KEY_S) === '1') sun = true;
     var sf = parseFloat(localStorage.getItem(KEY_F));
     if (isFinite(sf) && sf > 0) lastFill = sf;
@@ -536,7 +538,7 @@
   tab = act;
   unit = act === 'boat' ? 'nm' : 'km';
   odo = store[act].m; rideMs = store[act].t; fuel = store.boat.l || 0;
-  paused = pausedBy[act]; speedMode = modes[act];
+  paused = runState !== 'run'; speedMode = modes[act];   // paused = « on ne compte pas » (arrêt ou pause)
   function saveState(){
     store[act].m = odo; store[act].t = rideMs;
     if (act === 'boat') store.boat.l = fuel;
@@ -592,7 +594,7 @@
   function applyUnit(){
     unit = act === 'boat' ? 'nm' : 'km';
     elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
-    elU2u.textContent = unit === 'nm' ? 'miles' : 'm';
+    elU2u.textContent = unit === 'nm' ? 'miles' : 'km';
     elApp.classList.toggle('boat', act === 'boat');
     elHead.classList.toggle('bike', act === 'bike');   // à vélo : lettres du cap seules, sans degrés
     showFuel();
@@ -649,12 +651,13 @@
   });
   elNo.addEventListener('click', closeConfirm);
 
-  /* ---------- Pause manuelle : appui sur la vitesse ---------- */
-  function savePauses(){ try { localStorage.setItem(KEY_PZ, JSON.stringify(pausedBy)); } catch(e){} }
-  function setPaused(v){
-    paused = v; pausedBy[act] = v; fastSince = 0;
-    elApp.classList.toggle('paused', v);
-    savePauses();
+  /* ---------- État du comptage : arrêté (idle) · en marche (run) · pause ----------
+     Rien n'est compté (trip, temps, litres, séance) tant qu'on n'a pas appuyé sur ▶. */
+  function setRun(st){
+    runState = st; paused = st !== 'run'; fastSince = 0;
+    elApp.classList.toggle('paused', st === 'pause');
+    elApp.classList.toggle('idle', st === 'idle');
+    try { localStorage.setItem(KEY_RS, st); } catch(e){}
     setHead(lastHead, lastDeg);
   }
   var elToast = $('toast'), toastT = 0;
@@ -663,12 +666,17 @@
     clearTimeout(toastT); toastT = setTimeout(function(){ elToast.hidden = true; }, 1800);
   }
   elRowSpeed.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-  $('bPlay').addEventListener('click', function(){ setPaused(!paused); });
+  $('bPlay').addEventListener('click', function(){
+    if (runState === 'run') { setRun('pause'); return; }
+    var fresh = runState === 'idle';
+    setRun('run');
+    if (fresh) toast('Comptage démarré');
+  });
   $('bReset').addEventListener('click', openConfirm);
   $('bStop').addEventListener('click', function(){
-    if (!sess) { toast('Aucune séance en cours'); return; }
+    if (!sess) { setRun('idle'); toast('Aucune séance en cours'); return; }
     var ok = sess.d >= SESS_MIN_M;
-    closeSess();
+    closeSess(); setRun('idle');
     toast(ok ? 'Séance terminée et enregistrée' : 'Séance trop courte : non enregistrée');
   });
   /* Les boutons flottent juste au-dessus de la barre d'onglets */
@@ -678,15 +686,28 @@
     var n = $('nav').getBoundingClientRect();
     if (!n.height) return;
     elCtl.style.top = Math.round(n.top - elCtl.offsetHeight - Math.max(8, window.innerHeight * 0.008)) + 'px';
+    // Vélo : si l'écran est court, on libère juste ce qu'il faut pour que l'heure (et son cadran en mode soleil) ne touche pas les boutons
+    elApp.style.paddingBottom = '';
+    if (act === 'bike') {
+      var extra = 0, btnTop = elCtl.getBoundingClientRect().top;
+      for (var i = 0; i < 3; i++) {
+        var c = elClock.getBoundingClientRect();
+        var need = c.bottom + (sun ? window.innerHeight * 0.0045 : 0) + 6 - btnTop;
+        if (need <= 0) break;
+        extra += Math.ceil(need * 4 / 3);
+        elApp.style.paddingBottom = 'calc(3.2vh + ' + extra + 'px)';
+      }
+    }
   }
   window.addEventListener('resize', placeCtl);
-  if (paused) elApp.classList.add('paused');
+  elApp.classList.toggle('paused', runState === 'pause'); elApp.classList.toggle('idle', runState === 'idle');
 
   /* ---------- Mode soleil : appui sur l'heure ---------- */
   function setSun(v){
     sun = v;
     if (v) elApp.classList.add('sun'); else elApp.classList.remove('sun');
     $('bSun').setAttribute('aria-pressed', v ? 'true' : 'false');
+    if (typeof placeCtl === 'function') placeCtl();
     try { localStorage.setItem(KEY_S, v ? '1' : '0'); } catch(e){}
   }
   elClock.addEventListener('click', function(){ setSun(!sun); });
@@ -930,12 +951,11 @@
     saveState(); closeSess();            // la séance de l'autre activité se termine
     act = a;
     odo = store[a].m; rideMs = store[a].t; fuel = store.boat.l || 0;
-    paused = pausedBy[a]; speedMode = modes[a]; fastSince = 0;
+    speedMode = modes[a]; fastSince = 0;
     try { localStorage.setItem(KEY_TAB, a); } catch(e){}
     closeConfirm(); lastTs = 0;
-    elApp.classList.toggle('paused', paused);
     applyUnit();
-    setHead(lastHead, lastDeg);
+    setRun('idle');                      // en changeant d'activité, le comptage repart à l'arrêt
   }
   var NAV = { bike: 'tabBike', boat: 'tabBoat', menu: 'tabMenu' };
   function showTab(t){
@@ -968,7 +988,7 @@
     } else if (!lastFix && !denied) {
       setStatus('Recherche du GPS… ' + Math.round((now - startedAt) / 1000) + ' s');
     }
-    if (sess && now - sess.e > SESS_GAP_MS) closeSess();   // plus d'une heure sans rouler : séance terminée
+    if (sess && now - sess.e > SESS_GAP_MS) { closeSess(); setRun('idle'); }   // plus d'une heure sans rouler : séance terminée, comptage arrêté
     // Chien de garde : si le GPS ne donne plus rien pendant 10 s, on relance le suivi
     if (!denied && lastCall && now - Math.max(lastCall, restartAt) > 10000) startWatch();
   }
@@ -1021,15 +1041,15 @@
   var lastHead = '', lastDeg = null;
   function setHead(t, deg){
     lastHead = t; lastDeg = (typeof deg === 'number' && isFinite(deg)) ? deg : null;
-    var showVal = !paused && !!t;
-    var key = paused ? 'P' : (t ? 'V' : 'A');
+    var showVal = runState !== 'pause' && !!t;
+    var key = runState === 'pause' ? 'P' : (t ? 'V' : 'A');
     if (elHmsg._k !== key) {
       elHmsg._k = key;
       elHmsg.textContent = '';   // plus de mot « PAUSE » : le bouton ▶ jaune et les chiffres gris suffisent
     }
     elHmsg.hidden = showVal;
     elHval.hidden = !showVal;
-    var label = paused ? 'En pause' : 'Pas de cap';
+    var label = runState === 'pause' ? 'En pause' : 'Pas de cap';
     if (showVal) {
       var d = lastDeg === null ? 0 : ((Math.round(lastDeg) % 360) + 360) % 360;
       elHl.textContent = t;
@@ -1110,9 +1130,9 @@
     lastKmh = kmh; showSpeed();
 
     // Reprise automatique : en pause, rouler à plus de 12 km/h pendant 5 s relance le comptage
-    if (paused && unit === 'km' && kmh >= RESUME_KMH) {
+    if (runState === 'pause' && unit === 'km' && kmh >= RESUME_KMH) {
       if (!fastSince) fastSince = p.timestamp;
-      else if (p.timestamp - fastSince >= RESUME_MS) setPaused(false);
+      else if (p.timestamp - fastSince >= RESUME_MS) setRun('run');
     } else {
       fastSince = 0;
     }
