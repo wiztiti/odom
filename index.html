@@ -47,12 +47,11 @@
   .seg .off{opacity:.09}
 
   #speed{height:var(--sp-h);color:var(--speed)}
-  /* "km/h" est un bouton sans cadre : un appui bascule entre km/h et nœuds.
-     Centré sur la vitesse puis descendu d'un peu plus d'un cinquième de sa hauteur. */
+  /* L'unité (km/h ou knots) suit l'onglet. Centrée sur la vitesse puis descendue d'un peu plus d'un cinquième de sa hauteur. */
   #u1{
     align-self:center;transform:translateY(calc(var(--sp-h) * .22));
     font:inherit;font-size:min(4.6vw,2.8vh);font-weight:700;line-height:1;color:var(--speed);
-    background:none;border:0;padding:.5em .6em;margin-left:-.2em;cursor:pointer;
+    background:none;border:0;padding:.5em .6em;margin-left:-.2em;cursor:default;
   }
   #u1:active{opacity:.55}
   #u1:focus-visible{outline:3px solid #fff;outline-offset:2px}
@@ -100,7 +99,7 @@
     content:"";position:absolute;inset:-2.4vh 4vw;border-radius:24px;background:var(--panel);z-index:-1;
   }
   #rowSpeed{--panel:var(--panel-speed);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
-  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 4vh);transform:translateX(-50%);z-index:20;
+  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 84px);transform:translateX(-50%);z-index:20;
     background:#222;color:#fff;border:1px solid #666;border-radius:10px;padding:.55em 1em;font-size:min(4vw,2.4vh);white-space:nowrap}
   #app.sun #toast{background:#fff;color:#000;border-color:#000}
   .trip{--panel:var(--panel-trip)}
@@ -112,44 +111,64 @@
   #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
   #app.sun #no{color:#101010;border-color:rgba(16,16,16,.55)}
 
-  /* Aide : petit « ? » discret en haut à droite, ouvre un mémo très court */
-  #helpBtn{
-    position:fixed;z-index:5;width:28px;height:28px;padding:0;border-radius:50%;
-    top:calc(env(safe-area-inset-top) + 10px);right:calc(env(safe-area-inset-right) + 12px);
-    font:inherit;font-size:15px;font-weight:700;line-height:1;cursor:pointer;
-    background:none;color:rgba(255,255,255,.55);border:1.5px solid rgba(255,255,255,.35);
+  /* Onglets : barre fixe en bas (superposée : elle ne déplace pas les chiffres) */
+  #nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;
+    padding:6px 8px calc(env(safe-area-inset-bottom) + 6px);background:#000;border-top:1px solid rgba(255,255,255,.18);
   }
-  #helpBtn::after{content:"";position:absolute;inset:-10px}   /* zone d'appui plus large que le rond */
-  #helpBtn:focus-visible{outline:3px solid #fff;outline-offset:2px}
-  #help{
-    position:fixed;inset:0;z-index:10;box-sizing:border-box;overflow:auto;
-    display:flex;align-items:center;justify-content:center;cursor:pointer;
-    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
-    background:#000;color:var(--time);
+  #nav button{
+    flex:1;max-width:170px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:none;border:0;color:rgba(255,255,255,.55);font:inherit;font-size:12px;font-weight:700;
+    padding:4px 0;cursor:pointer;
   }
-  #app.sun #help{background:#FFFBEB}
-  #help .card{width:100%;max-width:420px;display:flex;flex-direction:column;gap:2.6vh}
-  #help h2{margin:0;font-size:min(6vw,3.6vh);font-weight:800}
-  #help ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2.2vh}
-  #help li{display:flex;flex-direction:column;gap:.25em;font-size:min(4.4vw,2.7vh);line-height:1.3}
-  #help li b{font-size:1.08em;letter-spacing:.02em}
-  #help li span{opacity:.9}
-  #help .c-speed{color:var(--speed)}
-  #help .c-trip{color:var(--km)}
-  #help .c-time{color:var(--cap)}
-  #help .hint{margin:0;font-size:min(3.8vw,2.3vh);opacity:.6}
-  #help li.histo{cursor:pointer;border:1.5px solid var(--ride);border-radius:12px;padding:1.4vh 3.5vw}
-  #help li.histo b{color:var(--ride)}
+  #nav svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  #nav button[aria-selected=true]{color:var(--speed)}
+  #nav button:focus-visible{outline:3px solid #fff;outline-offset:-3px;border-radius:8px}
+  #app.sun #nav{background:#FFFBEB;border-top-color:rgba(0,0,0,.2)}
+  #app.sun #nav button{color:rgba(16,16,16,.55)}
+  #app.sun #nav button[aria-selected=true]{color:var(--speed)}
+  #app.inmenu .scr{display:none}
+
+  /* Onglet Menu : historique, réglages, aide */
+  #menu{
+    position:fixed;left:0;right:0;top:0;bottom:calc(env(safe-area-inset-bottom) + 66px);z-index:10;
+    box-sizing:border-box;overflow:auto;background:#000;color:var(--time);
+    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));
+    font-size:min(4.2vw,2.6vh);line-height:1.3;
+  }
+  #app.sun #menu{background:#FFFBEB}
+  #menu .wrap{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:1.8vh}
+  #menu h2{margin:0;font-size:min(6vw,3.6vh);font-weight:800}
+  #menu h3{margin:0 0 .5em;font-size:1em;font-weight:800;letter-spacing:.02em}
+  #menu button{font:inherit;color:inherit;cursor:pointer}
+  #menu .big{display:flex;flex-direction:column;align-items:flex-start;gap:.25em;text-align:left;background:none;border:1.5px solid var(--ride);border-radius:12px;padding:1.4vh 3.5vw}
+  #menu .big b{color:var(--ride);font-size:1.08em}
+  #menu .big span{opacity:.9;font-size:.92em}
+  #menu .card2{border:1px solid rgba(128,128,128,.45);border-radius:12px;padding:1.2vh 3.5vw}
+  #menu .set{display:flex;align-items:center;justify-content:space-between;gap:.8em;padding:.55em 0;border-top:1px solid rgba(128,128,128,.25)}
+  #menu .set:first-of-type{border-top:0}
+  #menu .set small{opacity:.7}
+  #menu .set button{background:none;border:1.5px solid currentColor;border-radius:10px;padding:.3em .8em;opacity:.85;font-size:.92em}
+  #menu .set button[aria-pressed=true]{background:var(--speed);border-color:var(--speed);color:#000;opacity:1;font-weight:800}
+  #app.sun #menu .set button[aria-pressed=true]{color:#fff}
+  #menu .seg3{display:flex;gap:.35em}
+  #menu ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.6vh}
+  #menu li{display:flex;flex-direction:column;gap:.2em;font-size:.95em}
+  #menu li b{font-size:1.05em;letter-spacing:.02em}
+  #menu li span{opacity:.88}
+  #menu .c-speed{color:var(--speed)}
+  #menu .c-trip{color:var(--km)}
+  #menu .c-time{color:var(--cap)}
 
   /* Historique : liste jour par jour, séance par séance */
-  #histo{
-    position:fixed;inset:0;z-index:11;box-sizing:border-box;overflow:auto;
-    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
-    background:#000;color:var(--time);font-size:min(4.2vw,2.6vh);line-height:1.3;
-  }
-  #app.sun #histo{background:#FFFBEB}
-  #histo .wrap{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:1.6vh}
-  #histo .top{display:flex;align-items:center;justify-content:space-between}
+  #histo{font-size:inherit}
+  #histo .wrap{display:flex;flex-direction:column;gap:1.4vh}
+  #histo .top{display:flex;align-items:center;justify-content:space-between;gap:.6em}
+  #histo .pick{display:flex;gap:.4em}
+  #histo .pick button{flex:1;font-weight:700}
+  #histo .pick button[aria-pressed=true]{background:var(--speed);border-color:var(--speed);color:#000;opacity:1;font-weight:800}
+  #app.sun #histo .pick button[aria-pressed=true]{color:#fff}
+  #histo .total{font-weight:800;color:var(--km);font-size:1.02em}
   #histo h2{margin:0;font-size:min(6vw,3.6vh);font-weight:800}
   #histo button{font:inherit;font-size:.9em;color:inherit;background:none;border:1.5px solid currentColor;border-radius:10px;padding:.35em .8em;cursor:pointer;opacity:.85}
   #histo .day{display:flex;justify-content:space-between;align-items:baseline;margin-top:1.6vh;padding-bottom:.3em;border-bottom:1px solid rgba(128,128,128,.5);font-weight:800;color:var(--km)}
@@ -189,6 +208,8 @@
   #hval{display:flex;align-items:center;gap:.3em}
   #hl{display:inline-block;width:1.9em;text-align:right}   /* 1 à 2 lettres : N, NE, SW... position stable */
   #hd{height:.78em;color:var(--cap)}
+  #head.bike #hd{display:none}                                   /* à vélo : lettres seules, sans degrés */
+  #head.bike #hl{width:auto;text-align:center}
 
   #status{
     position:absolute;left:0;right:0;text-align:center;
@@ -201,12 +222,12 @@
   <div id="status" role="status">Recherche du GPS…</div>
 
   <main id="app">
-    <section class="row panel" id="rowSpeed">
+    <section class="row panel scr" id="rowSpeed">
       <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
-      <button id="u1" class="side" type="button" aria-label="Changer d'unité : km/h ou nœuds">km/h</button>
+      <span id="u1" class="side" aria-label="Unité">km/h</span>
     </section>
 
-    <div class="trip panel" id="trip" role="button" tabindex="0" aria-label="Trip : toucher pour remettre à zéro">
+    <div class="trip panel scr" id="trip" role="button" tabindex="0" aria-label="Trip : toucher pour remettre à zéro">
       <section class="row">
         <svg id="km" class="num seg" role="img" aria-label="Distance"></svg>
         <span id="u2" class="side"><small>trip</small><span id="u2u">m</span></span>
@@ -230,7 +251,7 @@
       </div>
     </div>
 
-    <div class="clock panel" id="clock">
+    <div class="clock panel scr" id="clock">
       <section class="row">
         <svg id="time" class="num seg" role="img" aria-label="Heure"></svg>
       </section>
@@ -242,29 +263,49 @@
         </span>
       </section>
     </div>
-    <button id="helpBtn" type="button" aria-label="Aide">?</button>
-    <div id="help" role="dialog" aria-label="Aide" hidden>
-      <div class="card">
-        <h2>Aide</h2>
-        <ul>
-          <li class="histo" id="histoBtn" role="button" tabindex="0"><b>Historique ›</b><span>Vos séances, jour par jour.</span></li>
-          <li><b class="c-speed">Vitesse</b><span>Toucher : pause / reprise (reprise automatique au-dessus de 12 km/h). Appui long : précision 0,1 / 0,2 / « + ».</span></li>
-          <li><b class="c-speed">km/h</b><span>Toucher : passer en knots, et le trip en miles. Re-toucher pour revenir.</span></li>
-          <li><b class="c-trip">Trip</b><span>Distance et temps de roulage. Toucher : remise à zéro, avec confirmation. En knots : litres estimés (appui long : calibrage).</span></li>
-          <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
-        </ul>
-        <p class="hint">Toucher l'écran pour fermer</p>
-      </div>
-    </div>
     <div id="toast" role="status" hidden></div>
-    <div id="histo" role="dialog" aria-label="Historique" hidden>
-      <div class="wrap">
-        <div class="top"><h2>Historique</h2><div class="acts"><button id="histoSel" type="button">Sélectionner</button><button id="histoClose" type="button">Fermer</button></div></div>
-        <div id="histoFill"></div>
-        <div id="histoList"></div>
-        <div id="histoBar" hidden></div>
+
+    <div id="menu" hidden>
+      <div id="menuHome" class="wrap">
+        <h2>Menu</h2>
+        <button id="histoBtn" class="big" type="button"><b>Historique ›</b><span>Vos séances, jour par jour.</span></button>
+
+        <section class="card2">
+          <h3>Réglages</h3>
+          <div class="set"><span>Mode plein soleil</span><button id="setSun" type="button"></button></div>
+          <div class="set"><span>Vitesse vélo</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button></div></div>
+          <div class="set"><span>Vitesse bateau</span><div class="seg3" data-act="boat"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button></div></div>
+          <div class="set"><span>Calibrage conso <small id="calVal"></small></span><button id="setCal" type="button">Régler</button></div>
+        </section>
+
+        <section class="card2">
+          <h3>Aide</h3>
+          <ul>
+            <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte.</span></li>
+            <li><b class="c-speed">Vitesse</b><span>Toucher : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). La précision se règle dans Réglages.</span></li>
+            <li><b class="c-trip">Trip</b><span>Distance et temps de roulage. Toucher : remise à zéro, avec confirmation. Bateau : litres estimés (appui long : calibrage).</span></li>
+            <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
+          </ul>
+        </section>
+      </div>
+
+      <div id="histo" hidden>
+        <div class="wrap">
+          <div class="top"><button id="histoBack" type="button">‹ Retour</button><h2>Historique</h2><button id="histoSel" type="button">Sélectionner</button></div>
+          <div class="pick" id="histoPick"><button type="button" data-a="bike">Vélo</button><button type="button" data-a="boat">Bateau</button></div>
+          <div id="histoTotal" class="total"></div>
+          <div id="histoFill"></div>
+          <div id="histoList"></div>
+          <div id="histoBar" hidden></div>
+        </div>
       </div>
     </div>
+
+    <nav id="nav" role="tablist" aria-label="Onglets">
+      <button id="tabBike" type="button" role="tab" aria-selected="true"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="21" r="5.5"/><circle cx="24" cy="21" r="5.5"/><path d="M8 21 L13 11 H20 L24 21 M13 11 L17.5 21 H8 M12 8 H15 M20 11 L18.5 7.5 H22"/></svg><span>Vélo</span></button>
+      <button id="tabBoat" type="button" role="tab" aria-selected="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 22 H28 L24 27 H8 Z M16 4 V22 M16 6 L26 19 H16 M14 10 L7 19 H14"/></svg><span>Bateau</span></button>
+      <button id="tabMenu" type="button" role="tab" aria-selected="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 9 H27 M5 16 H27 M5 23 H27"/></svg><span>Menu</span></button>
+    </nav>
   </main>
 
 <script>
@@ -288,7 +329,11 @@
   var KEY_F = 'compteur-velo-plein';   // date (ms) du dernier « plein fait »
   var KEY_K = 'compteur-velo-calib';    // coefficient de calibrage de la conso
   var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
-  var KEY_U = 'compteur-velo-unit'; // unité choisie : 'km' (km/h) ou 'nm' (nœuds / milles nautiques)
+  var KEY_U = 'compteur-velo-unit'; // ancienne unité choisie (sert à la migration)
+  var KEY_ST = 'compteur-velo-compteurs';  // compteurs séparés : { bike:{m,t}, boat:{m,t,l} }
+  var KEY_TAB = 'compteur-velo-onglet';    // dernière activité affichée : 'bike' ou 'boat'
+  var KEY_PM = 'compteur-velo-precisions'; // précision de la vitesse par activité
+  var KEY_PZ = 'compteur-velo-pauses';     // pause manuelle par activité
 
   var $ = function(id){ return document.getElementById(id); };
   var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elFuel = $('fuel'), elRowFuel = $('rowFuel'), elTime = $('time'),
@@ -296,7 +341,7 @@
       elU1 = $('u1'), elU2u = $('u2u'),
       elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no'),
       elApp = $('app'), elRowSpeed = $('rowSpeed'), elClock = $('clock'),
-      elHelpBtn = $('helpBtn'), elHelp = $('help'),
+      elMenu = $('menu'), elMenuHome = $('menuHome'),
       elHmsg = $('hmsg'), elHval = $('hval'), elHl = $('hl'), elHd = $('hd');
 
   /* ---------- Affichage à segments (7 segments) ---------- */
@@ -382,20 +427,36 @@
   }
 
   /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
-  var odo = 0, rideMs = 0, lastKmh = 0, unit = 'km', paused = false, fastSince = 0, sun = false,
-      hist = [], sess = null, speedMode = 'd1', fuel = 0, fuelCal = 1, lastFill = 0;
+  var act = 'bike';                 // activité comptée : 'bike' (vélo) ou 'boat' (bateau) ; seul l'onglet affiché compte
+  var tab = 'bike';                 // onglet affiché : 'bike', 'boat' ou 'menu' (pendant le menu, la dernière activité continue de compter)
+  var unit = 'km';                  // dérivé de act : 'km' (km/h, mètres) ou 'nm' (nœuds, milles)
+  var store = { bike: { m: 0, t: 0 }, boat: { m: 0, t: 0, l: 0 } };   // compteurs séparés
+  var modes = { bike: 'd2', boat: 'd1' }, pausedBy = { bike: false, boat: false };
+  var odo = 0, rideMs = 0, fuel = 0;                                    // copie des compteurs de l'activité affichée
+  var lastKmh = 0, paused = false, fastSince = 0, sun = false, speedMode = 'd2',
+      hist = [], sess = null, fuelCal = 1, lastFill = 0;
+  function num(k){ var v = parseFloat(localStorage.getItem(k)); return isFinite(v) && v >= 0 ? v : 0; }
   try {
-    var sm = parseFloat(localStorage.getItem(KEY_M));
-    if (isFinite(sm) && sm >= 0) odo = sm;
-    var st = parseFloat(localStorage.getItem(KEY_T));
-    if (isFinite(st) && st >= 0) rideMs = st;
-    if (localStorage.getItem(KEY_U) === 'nm') unit = 'nm';
-    if (localStorage.getItem(KEY_P) === '1') paused = true;
+    var legacyAct = localStorage.getItem(KEY_U) === 'nm' ? 'boat' : 'bike';
+    var ss = JSON.parse(localStorage.getItem(KEY_ST) || 'null');
+    if (ss && ss.bike && ss.boat) {
+      store = ss;
+    } else {   // migration : l'ancien compteur unique revient à l'activité qui était affichée
+      store[legacyAct].m = num(KEY_M); store[legacyAct].t = num(KEY_T);
+      if (legacyAct === 'boat') store.boat.l = num(KEY_L);
+    }
+    store.bike.m = +store.bike.m || 0; store.bike.t = +store.bike.t || 0;
+    store.boat.m = +store.boat.m || 0; store.boat.t = +store.boat.t || 0; store.boat.l = +store.boat.l || 0;
+    var tb = localStorage.getItem(KEY_TAB);
+    act = (tb === 'boat' || tb === 'bike') ? tb : legacyAct;
+    var okm = function(v){ return v === 'd1' || v === 'd2' || v === 'plus'; };
+    var pm = JSON.parse(localStorage.getItem(KEY_PM) || 'null');
+    if (pm && okm(pm.bike) && okm(pm.boat)) modes = pm;
+    else { var oldm = localStorage.getItem(KEY_PR); if (okm(oldm)) modes.boat = oldm; }   // le bateau garde l'ancien réglage, le vélo passe à 0,2
+    var pz = JSON.parse(localStorage.getItem(KEY_PZ) || 'null');
+    if (pz && typeof pz === 'object') { pausedBy.bike = !!pz.bike; pausedBy.boat = !!pz.boat; }
+    else if (localStorage.getItem(KEY_P) === '1') pausedBy[legacyAct] = true;
     if (localStorage.getItem(KEY_S) === '1') sun = true;
-    var sp = localStorage.getItem(KEY_PR);
-    if (sp === 'd2' || sp === 'plus') speedMode = sp;
-    var sl = parseFloat(localStorage.getItem(KEY_L));
-    if (isFinite(sl) && sl >= 0) fuel = sl;
     var sf = parseFloat(localStorage.getItem(KEY_F));
     if (isFinite(sf) && sf > 0) lastFill = sf;
     var sk = parseFloat(localStorage.getItem(KEY_K));
@@ -405,12 +466,14 @@
     var sc = JSON.parse(localStorage.getItem(KEY_C) || 'null');
     if (sc && typeof sc.s === 'number' && typeof sc.e === 'number') sess = sc;
   } catch(e){}
+  tab = act;
+  unit = act === 'boat' ? 'nm' : 'km';
+  odo = store[act].m; rideMs = store[act].t; fuel = store.boat.l || 0;
+  paused = pausedBy[act]; speedMode = modes[act];
   function saveState(){
-    try {
-      localStorage.setItem(KEY_M, String(odo));
-      localStorage.setItem(KEY_T, String(rideMs));
-      localStorage.setItem(KEY_L, String(fuel));
-    } catch(e){}
+    store[act].m = odo; store[act].t = rideMs;
+    if (act === 'boat') store.boat.l = fuel;
+    try { localStorage.setItem(KEY_ST, JSON.stringify(store)); } catch(e){}
   }
   /* ---------- Séances : enregistrées automatiquement, indépendamment du trip ----------
      Une séance démarre au premier mouvement. Elle se termine après 1 h sans rouler,
@@ -451,27 +514,26 @@
   }
   function fmtFuel(l){ return (l < 100 ? l.toFixed(1) : String(Math.round(l))); }
   function showFuel(){
-    elRowFuel.hidden = unit !== 'nm';
-    if (unit === 'nm') setSeg(elFuel, fmtFuel(fuel));
+    elRowFuel.hidden = act !== 'boat';
+    if (act === 'boat') setSeg(elFuel, fmtFuel(fuel));
   }
   function showKm(){ setSeg(elKm, fmtKm(odo)); }
   function showRide(){ setSeg(elRide, fmtRide(rideMs)); }
   // Vitesse : mesurée en km/h en interne, convertie en nœuds à l'affichage (1 kn = 1,852 km/h)
   function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh), true); }
   function applyUnit(){
-    showFuel();
+    unit = act === 'boat' ? 'nm' : 'km';
     elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
     elU2u.textContent = unit === 'nm' ? 'miles' : 'm';
+    elHead.classList.toggle('bike', act === 'bike');   // à vélo : lettres du cap seules, sans degrés
+    showFuel();
     showSpeed();
     showKm();
+    showRide();
   }
-  elU1.addEventListener('click', function(){
-    unit = unit === 'nm' ? 'km' : 'nm';
-    try { localStorage.setItem(KEY_U, unit); } catch(e){}
-    applyUnit();
-  });
   showRide();
   applyUnit();
+  if (sess && (sess.u === 'nm') !== (act === 'boat')) closeSess();   // séance restée ouverte d'une autre activité
 
   /* ---------- Remise à zéro : appui sur le trip, puis confirmation ---------- */
   var confirmTimer = null;
@@ -526,37 +588,20 @@
   elNo.addEventListener('click', closeConfirm);
 
   /* ---------- Pause manuelle : appui sur la vitesse ---------- */
+  function savePauses(){ try { localStorage.setItem(KEY_PZ, JSON.stringify(pausedBy)); } catch(e){} }
   function setPaused(v){
-    paused = v; fastSince = 0;
-    if (v) elApp.classList.add('paused'); else elApp.classList.remove('paused');
-    try { localStorage.setItem(KEY_P, v ? '1' : '0'); } catch(e){}
+    paused = v; pausedBy[act] = v; fastSince = 0;
+    elApp.classList.toggle('paused', v);
+    savePauses();
     setHead(lastHead, lastDeg);
   }
-  var lpTimer = 0, lpDone = false, elToast = $('toast'), toastT = 0;
+  var elToast = $('toast'), toastT = 0;
   function toast(t){
     elToast.textContent = t; elToast.hidden = false;
     clearTimeout(toastT); toastT = setTimeout(function(){ elToast.hidden = true; }, 1800);
   }
-  function lpCancel(){ clearTimeout(lpTimer); lpTimer = 0; }
-  elRowSpeed.addEventListener('pointerdown', function(e){
-    if (elU1.contains(e.target)) return;
-    lpDone = false; lpCancel();
-    lpTimer = setTimeout(function(){
-      lpDone = true; lpTimer = 0;
-      speedMode = speedMode === 'd1' ? 'd2' : speedMode === 'd2' ? 'plus' : 'd1';
-      try { localStorage.setItem(KEY_PR, speedMode); } catch(e){}
-      showSpeed();
-      toast(speedMode === 'd1' ? 'Vitesse : 0,1 près' : speedMode === 'd2' ? 'Vitesse : 0,2 près' : 'Vitesse : entier et « + »');
-      if (navigator.vibrate) { try { navigator.vibrate(30); } catch(e){} }
-    }, 650);
-  });
-  ['pointerup','pointercancel','pointerleave'].forEach(function(n){ elRowSpeed.addEventListener(n, lpCancel); });
   elRowSpeed.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-  elRowSpeed.addEventListener('click', function(e){
-    if (elU1.contains(e.target)) return;   // le bouton d'unité garde sa propre action
-    if (lpDone) { lpDone = false; return; } // l'appui long ne déclenche pas la pause
-    setPaused(!paused);
-  });
+  elRowSpeed.addEventListener('click', function(){ setPaused(!paused); });
   if (paused) elApp.classList.add('paused');
 
   /* ---------- Mode soleil : appui sur l'heure ---------- */
@@ -568,12 +613,9 @@
   elClock.addEventListener('click', function(){ setSun(!sun); });
   if (sun) elApp.classList.add('sun');
 
-  /* ---------- Aide : « ? » en haut à droite ---------- */
-  elHelpBtn.addEventListener('click', function(){ elHelp.hidden = false; });
-  elHelp.addEventListener('click', function(){ elHelp.hidden = true; });
   var elHisto = $('histo'), elHistoList = $('histoList');
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape') { if (!elHisto.hidden) elHisto.hidden = true; else elHelp.hidden = true; }
+    if (e.key === 'Escape' && !elHisto.hidden) closeHisto();
   });
 
   /* ---------- Historique ---------- */
@@ -604,9 +646,11 @@
     if (sess && sess.s >= lastFill) t += sess.l || 0;
     return t;
   }
+  var histAct = 'bike';   // activité affichée dans l'historique (sélecteur Vélo | Bateau)
+  function hhmm(ms){ var m = Math.floor(ms / 60000); return Math.floor(m / 60) + ' h ' + p2(m % 60); }
   function renderFill(){
     var el = $('histoFill'), h = '<div class="fill">';
-    if (unit !== 'nm') { el.innerHTML = ''; return; }   // réglage visible seulement en mode knots
+    if (histAct !== 'boat') { el.innerHTML = ''; return; }   // réglage visible seulement pour le bateau
     if (!lastFill) {
       h += '<span>Calibrage de la conso : après un plein, touchez « Plein fait » pour poser le point de départ.</span>';
     } else {
@@ -709,13 +753,23 @@
     saveHist(); setSelMode(false);
   }
   function renderHisto(){
+    var boat = histAct === 'boat';
+    function mine(x){ return isBoat(x) === boat; }
     renderFill();
-    var all = hist.slice();
-    if (sess && sess.d >= SESS_MIN_M) all.push(sess);
+    Array.prototype.forEach.call($('histoPick').children, function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-a') === histAct ? 'true' : 'false'); });
+    var all = hist.filter(mine);
+    var hasHist = all.length > 0;
+    if (sess && mine(sess) && sess.d >= SESS_MIN_M) all.push(sess);
     rows = all;
-    picked = picked.filter(function(x){ return hist.indexOf(x) >= 0; });
-    $('histoSel').hidden = !hist.length;
-    if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune séance enregistrée pour l\'instant.</p>'; renderBar(); return; }
+    picked = picked.filter(function(x){ return all.indexOf(x) >= 0; });
+    $('histoSel').hidden = !hasHist;
+    var td = 0, tt = 0, tl = 0;
+    all.forEach(function(x){ td += x.d; tt += x.t; tl += x.l || 0; });
+    $('histoTotal').textContent = all.length
+      ? 'Total : ' + (boat ? (td / 1852).toFixed(1).replace('.', ',') + ' miles' : (td / 1000).toFixed(1).replace('.', ',') + ' km') +
+        ' · ' + hhmm(tt) + (boat && tl > 0 ? ' · ' + fl(tl) : '')
+      : '';
+    if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune sortie ' + (boat ? 'en bateau' : 'à vélo') + ' enregistrée pour l\'instant.</p>'; renderBar(); return; }
     all.sort(function(a, b){ return b.s - a.s; });
     var html = '', cur = '', days = [];
     all.forEach(function(x){
@@ -723,13 +777,11 @@
       if (k !== cur) { cur = k; days.push({ ts: x.s, items: [] }); }
       days[days.length - 1].items.push(x);
     });
+    var ua = boat ? 'nm' : 'km';
     days.forEach(function(g){
-      var tk = 0, tn = 0, tt = 0, tl = 0;   // distances séparées : km (vélo) et miles (bateau)
-      g.items.forEach(function(x){ if (x.u === 'nm') tn += x.d; else tk += x.d; tt += x.t; tl += x.l || 0; });
-      var dd = [];
-      if (tk > 0) dd.push(dist(tk, 'km'));
-      if (tn > 0) dd.push(dist(tn, 'nm'));
-      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dd.join(' · ')) + ' · ' + esc(dur(tt)) + (tl > 0 ? ' · ' + esc(fl(tl)) : '') + '</small></div>';
+      var dd = 0, dt2 = 0, dl = 0;
+      g.items.forEach(function(x){ dd += x.d; dt2 += x.t; dl += x.l || 0; });
+      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dist(dd, ua)) + ' · ' + esc(dur(dt2)) + (dl > 0 ? ' · ' + esc(fl(dl)) : '') + '</small></div>';
       g.items.forEach(function(x){
         var avg = x.t > 0 ? x.d / (x.t / 1000) * 3.6 : 0;
         var cls = 's' + (x === sess ? ' off' : '') + (picked.indexOf(x) >= 0 ? ' on' : '');
@@ -751,11 +803,71 @@
     if (k >= 0) picked.splice(k, 1); else picked.push(x);
     renderHisto();
   });
-  function openHisto(e){ e.stopPropagation(); selMode = false; picked = []; elHisto.classList.remove('sel'); $('histoSel').textContent = 'Sélectionner'; renderHisto(); elHisto.hidden = false; elHisto.scrollTop = 0; }
+  function openHisto(e){
+    if (e) e.stopPropagation();
+    selMode = false; picked = []; elHisto.classList.remove('sel'); $('histoSel').textContent = 'Sélectionner';
+    histAct = act;                      // on ouvre l'historique de l'activité en cours
+    elMenuHome.hidden = true; elHisto.hidden = false;
+    renderHisto(); elMenu.scrollTop = 0;
+  }
+  function closeHisto(){ elHisto.hidden = true; elMenuHome.hidden = false; refreshSettings(); elMenu.scrollTop = 0; }
   $('histoBtn').addEventListener('click', openHisto);
-  $('histoBtn').addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHisto(e); } });
-  $('histoClose').addEventListener('click', function(){ elHisto.hidden = true; });
+  $('histoBack').addEventListener('click', closeHisto);
   $('histoSel').addEventListener('click', function(){ setSelMode(!selMode); });
+  $('histoPick').addEventListener('click', function(e){
+    var a = e.target.getAttribute && e.target.getAttribute('data-a');
+    if (!a || a === histAct) return;
+    histAct = a; selMode = false; picked = []; elHisto.classList.remove('sel'); $('histoSel').textContent = 'Sélectionner';
+    renderHisto();
+  });
+
+  /* ---------- Réglages (onglet Menu) ---------- */
+  function refreshSettings(){
+    var b = $('setSun'); b.textContent = sun ? 'Activé' : 'Désactivé'; b.setAttribute('aria-pressed', sun ? 'true' : 'false');
+    Array.prototype.forEach.call(document.querySelectorAll('#menu .seg3'), function(g){
+      var a = g.getAttribute('data-act');
+      Array.prototype.forEach.call(g.children, function(btn){ btn.setAttribute('aria-pressed', btn.getAttribute('data-pr') === modes[a] ? 'true' : 'false'); });
+    });
+    $('calVal').textContent = '×' + String(Math.round(fuelCal * 100) / 100).replace('.', ',');
+  }
+  $('setSun').addEventListener('click', function(){ setSun(!sun); refreshSettings(); });
+  $('setCal').addEventListener('click', function(){ askCal(); refreshSettings(); });
+  Array.prototype.forEach.call(document.querySelectorAll('#menu .seg3'), function(g){
+    g.addEventListener('click', function(e){
+      var pr = e.target.getAttribute && e.target.getAttribute('data-pr');
+      if (!pr) return;
+      var a = g.getAttribute('data-act');
+      modes[a] = pr;
+      try { localStorage.setItem(KEY_PM, JSON.stringify(modes)); } catch(err){}
+      if (a === act) { speedMode = pr; showSpeed(); }
+      refreshSettings();
+    });
+  });
+
+  /* ---------- Onglets : Vélo | Bateau | Menu ---------- */
+  function setAct(a){
+    if (a === act) return;
+    saveState(); closeSess();            // la séance de l'autre activité se termine
+    act = a;
+    odo = store[a].m; rideMs = store[a].t; fuel = store.boat.l || 0;
+    paused = pausedBy[a]; speedMode = modes[a]; fastSince = 0;
+    try { localStorage.setItem(KEY_TAB, a); } catch(e){}
+    closeConfirm(); lastTs = 0;
+    elApp.classList.toggle('paused', paused);
+    applyUnit();
+    setHead(lastHead, lastDeg);
+  }
+  var NAV = { bike: 'tabBike', boat: 'tabBoat', menu: 'tabMenu' };
+  function showTab(t){
+    if (t === 'bike' || t === 'boat') setAct(t);
+    tab = t;
+    elApp.classList.toggle('inmenu', t === 'menu');
+    elMenu.hidden = t !== 'menu';
+    if (t === 'menu') { elHisto.hidden = true; elMenuHome.hidden = false; refreshSettings(); elMenu.scrollTop = 0; }
+    Object.keys(NAV).forEach(function(k){ $(NAV[k]).setAttribute('aria-selected', k === t ? 'true' : 'false'); });
+  }
+  Object.keys(NAV).forEach(function(k){ $(NAV[k]).addEventListener('click', function(){ showTab(k); }); });
+  showTab(act);
 
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
