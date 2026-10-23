@@ -24,6 +24,7 @@
     --panel-clock:#FFF3BF;   /*   jaune très clair */
     --sp-h:min(29vw,18vh);   /* hauteur des chiffres de la vitesse */
     --dim:#9a9a9a;
+    --dial-bg:#070707; --dial-ink:#FFFFFF; --dial-rim:#3c3c3c; --lubber:#FF3B30;   /* compas du bateau */
   }
   [hidden]{display:none!important}
   html,body{height:100%;margin:0;background:var(--bg);color:var(--time)}
@@ -105,13 +106,37 @@
   #app.sun #toast{background:#fff;color:#000;border-color:#000}
   .trip{--panel:var(--panel-trip)}
   .clock{--panel:var(--panel-clock);cursor:pointer}
-  #app.sun{--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
+  #app.sun{--dial-bg:#FFFBEB;--dial-ink:#101010;--dial-rim:#6b5a20;--lubber:#C4001A;--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
   #app.sun .seg .off{opacity:.045}
   #app.sun .clock::before{inset:-2.4vh 4vw -0.9vh}   /* cadran de l'heure un peu moins haut en bas, pour laisser la place aux boutons */
   #app.sun #confirm{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
   #app.sun #confirm p{color:var(--km)}
   #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
   #app.sun #no{color:#101010;border-color:rgba(16,16,16,.55)}
+
+  /* Compas du bateau (onglet Bateau) : rose classique qui tourne derrière une ligne de foi fixe ; vitesse au centre */
+  #app.boat{--D:min(92vw,42vh);--sp-h:calc(var(--D) * .26);
+    padding-bottom:calc(66px + min(13vw,6.2vh) + 18px)}   /* la place des boutons et de la barre d'onglets est réservée */
+  #dial,#dialHd,#timeB{display:none}
+  #app.boat #dial{display:block;grid-area:1/1;width:var(--D);height:var(--D)}
+  #app.boat #dialHd{display:block;position:absolute;z-index:3;left:50%;top:calc(var(--D) * .215);transform:translateX(-50%);height:calc(var(--D) * .085);color:var(--cap)}
+  #app.boat #timeB{display:block;position:fixed;z-index:4;left:calc(env(safe-area-inset-left) + 4vw);top:calc(env(safe-area-inset-top) + 1.6vh);height:min(7.4vw,3.6vh);color:#fff}
+  #app.boat #topBlock{position:relative;display:grid;place-items:center;width:var(--D);height:var(--D)}
+  #app.boat #rowSpeed{grid-area:1/1;z-index:2;width:auto;display:flex;flex-direction:column;align-items:center;gap:calc(var(--D) * .025);margin-top:calc(var(--D) * .03)}
+  #app.boat #rowSpeed::before{display:none}
+  #app.boat #u1{transform:none;margin:0;padding:0;align-self:auto;font-size:calc(var(--D) * .058)}
+  #app.boat .clock{display:none}
+  #app.boat #km{height:min(10.5vw,6.2vh)}
+  #app.boat #ride{height:min(7.6vw,4.5vh)}
+  #app.boat #fuel{height:min(7vw,4.1vh)}
+  #app.boat .trip{gap:1.1vh}
+  #dial .d-bg{fill:var(--dial-bg);stroke:var(--dial-rim);stroke-width:4}
+  #dial .d-t{stroke:var(--dial-ink);fill:none}
+  #dial .d-n{fill:var(--dial-ink);font:700 19px ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;text-anchor:middle}
+  #dial .d-c{fill:var(--cap);font:800 44px ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;text-anchor:middle}
+  #dial .d-l{fill:var(--lubber);stroke:var(--dial-bg);stroke-width:2.5;stroke-linejoin:round}
+  #rose{transition:transform .7s ease-out}
+  #dial.stale #rose,#dialHd.stale{opacity:.5}
 
   /* Boutons : lecture/pause, arrêt de séance, remise à zéro, mode soleil. Placés juste au-dessus de la barre d'onglets
      par le script (ils flottent au-dessus de la page : aucun chiffre ne bouge). */
@@ -253,10 +278,15 @@
   <div id="status" role="status">Recherche du GPS…</div>
 
   <main id="app">
-    <section class="row panel scr" id="rowSpeed">
-      <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
-      <span id="u1" class="side" aria-label="Unité">km/h</span>
-    </section>
+    <div id="topBlock" class="scr">
+      <svg id="dial" viewBox="0 0 400 400" role="img" aria-label="Compas" aria-hidden="false"></svg>
+      <svg id="dialHd" class="seg" role="img" aria-label="Cap en degrés"></svg>
+      <section class="row panel scr" id="rowSpeed">
+        <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
+        <span id="u1" class="side" aria-label="Unité">km/h</span>
+      </section>
+    </div>
+    <svg id="timeB" class="seg scr" role="img" aria-label="Heure"></svg>
 
     <div class="trip panel scr" id="trip">
       <section class="row">
@@ -318,7 +348,7 @@
         <section class="card2">
           <h3>Aide</h3>
           <ul>
-            <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte.</span></li>
+            <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte. Bateau : compas à rose tournante ; le cap vient du GPS (route sur le fond), il se fige à l'arrêt.</span></li>
             <li><b class="c-speed">Boutons ⏸ ■ ↺ ☀</b><span>⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, qui est rangée dans l'historique (le trip reste). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
             <li><b class="c-trip">Litres (bateau)</b><span>Consommation estimée. Appui long : calibrage (ou dans Réglages).</span></li>
             <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
@@ -373,7 +403,7 @@
   var KEY_PZ = 'compteur-velo-pauses';     // pause manuelle par activité
 
   var $ = function(id){ return document.getElementById(id); };
-  var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elFuel = $('fuel'), elRowFuel = $('rowFuel'), elTime = $('time'),
+  var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elFuel = $('fuel'), elRowFuel = $('rowFuel'), elTime = $('time'), elTimeB = $('timeB'), elDial = $('dial'), elDialHd = $('dialHd'),
       elHead = $('head'), elStatus = $('status'),
       elU1 = $('u1'), elU2u = $('u2u'),
       elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no'),
@@ -555,13 +585,15 @@
     if (act === 'boat') setSeg(elFuel, fmtFuel(fuel));
   }
   function showKm(){ setSeg(elKm, fmtKm(odo)); }
-  function showRide(){ setSeg(elRide, fmtRide(rideMs)); }
+  function fmtRideBoat(ms){ var m = Math.floor(ms / 60000); return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); }   // bateau : hh:mm
+  function showRide(){ setSeg(elRide, act === 'boat' ? fmtRideBoat(rideMs) : fmtRide(rideMs)); }
   // Vitesse : mesurée en km/h en interne, convertie en nœuds à l'affichage (1 kn = 1,852 km/h)
   function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh), true); }
   function applyUnit(){
     unit = act === 'boat' ? 'nm' : 'km';
     elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
     elU2u.textContent = unit === 'nm' ? 'miles' : 'm';
+    elApp.classList.toggle('boat', act === 'boat');
     elHead.classList.toggle('bike', act === 'bike');   // à vélo : lettres du cap seules, sans degrés
     showFuel();
     showSpeed();
@@ -927,7 +959,7 @@
   function tick(){
     var d = new Date();
     var t = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
-    if (t !== lastT) { setSeg(elTime, t); lastT = t; }
+    if (t !== lastT) { setSeg(elTime, t); setSeg(elTimeB, t); lastT = t; }
     var now = Date.now();
     if (lastFix && now - lastFix > 8000) {
       lastKmh = 0; showSpeed();
@@ -946,6 +978,40 @@
   function setStatus(msg){
     if (msg) { elStatus.textContent = msg; elStatus.hidden = false; }
     else { elStatus.hidden = true; }
+  }
+
+  /* ---------- Compas du bateau ---------- */
+  var rose = null, dialCum = 0, dialPrev = null, dialSeen = false;
+  (function buildDial(){
+    var C = 200, h = '<circle class="d-bg" cx="200" cy="200" r="196"/><g id="rose" style="transform-origin:200px 200px">';
+    function pol(r, a){ var t = a * Math.PI / 180; return [C + r * Math.sin(t), C - r * Math.cos(t)]; }
+    for (var a = 0; a < 360; a += 5) {
+      var len = a % 30 === 0 ? 22 : (a % 10 === 0 ? 14 : 8), w = a % 30 === 0 ? 3.2 : (a % 10 === 0 ? 2.2 : 1.4);
+      var p1 = pol(194, a), p2 = pol(194 - len, a);
+      h += '<line class="d-t" style="stroke-width:' + w + '" x1="' + p1[0].toFixed(1) + '" y1="' + p1[1].toFixed(1) + '" x2="' + p2[0].toFixed(1) + '" y2="' + p2[1].toFixed(1) + '"/>';
+    }
+    var CARD = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' };
+    for (var d = 0; d < 360; d += 30) {
+      if (CARD[d]) h += '<text class="d-c" transform="rotate(' + d + ' 200 200)" x="200" y="74">' + CARD[d] + '</text>';
+      else h += '<text class="d-n" transform="rotate(' + d + ' 200 200)" x="200" y="62">' + d + '</text>';
+    }
+    h += '</g><polygon class="d-l" points="184,0 216,0 200,34"/>';   // ligne de foi : repère fixe, avant du bateau
+    elDial.innerHTML = h;
+    rose = $('rose');
+  })();
+  function updateDial(deg){
+    var stale = (deg === null || typeof deg !== 'number');
+    elDial.classList.toggle('stale', stale); elDialHd.classList.toggle('stale', stale);
+    if (!stale) {
+      var d = ((Math.round(deg) % 360) + 360) % 360;
+      if (dialPrev === null) dialCum = d; else dialCum += ((d - dialPrev + 540) % 360) - 180;   // toujours par le plus court chemin
+      dialPrev = d;
+      rose.style.transform = 'rotate(' + (-dialCum) + 'deg)';
+      setSeg(elDialHd, ('00' + d).slice(-3) + '°');
+      dialSeen = true;
+    } else if (!dialSeen) {
+      setSeg(elDialHd, '---°');
+    }
   }
 
   /* ---------- Cap ---------- */
@@ -971,6 +1037,7 @@
       label = 'Cap ' + t + ', ' + d + ' degrés';
     }
     elHead.setAttribute('aria-label', label);
+    updateDial(lastDeg);
   }
   setHead('');
 
