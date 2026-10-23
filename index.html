@@ -35,7 +35,8 @@
     -webkit-user-select:none;user-select:none;touch-action:manipulation;
     -webkit-tap-highlight-color:transparent;
   }
-  main{flex:1;width:100%;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center}
+  main{flex:1;width:100%;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;
+       box-sizing:border-box;padding-bottom:3.2vh}   /* petite réserve en bas : les boutons posés sur la barre d'onglets ne touchent pas le cap */
 
   /* Les chiffres sont dans la colonne centrale, donc centrés sur l'écran ; unités et cap sont à droite */
   .row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:baseline;column-gap:2vw;width:100%;white-space:nowrap;line-height:1}
@@ -106,17 +107,19 @@
   .clock{--panel:var(--panel-clock);cursor:pointer}
   #app.sun{--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
   #app.sun .seg .off{opacity:.045}
+  #app.sun .clock::before{inset:-2.4vh 4vw -0.9vh}   /* cadran de l'heure un peu moins haut en bas, pour laisser la place aux boutons */
   #app.sun #confirm{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
   #app.sun #confirm p{color:var(--km)}
   #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
   #app.sun #no{color:#101010;border-color:rgba(16,16,16,.55)}
 
-  /* Boutons : lecture/pause, arrêt de séance, remise à zéro. Placés entre le trip et l'heure par le script
-     (ils flottent au-dessus de la page : aucun chiffre ne bouge). */
-  #ctl{position:fixed;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:min(5vw,3vh);pointer-events:none}
+  /* Boutons : lecture/pause, arrêt de séance, remise à zéro, mode soleil. Placés juste au-dessus de la barre d'onglets
+     par le script (ils flottent au-dessus de la page : aucun chiffre ne bouge). */
+  #ctl{position:fixed;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:min(3vw,1.6vh);pointer-events:none}
+  /* Boutons pleins et colorés, icônes noires : bien visibles au soleil */
   #ctl button{
-    pointer-events:auto;width:min(22vw,11.5vh);height:min(13vw,6.2vh);padding:0;border-radius:999px;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;background:#101010;color:#fff;border:2px solid rgba(255,255,255,.6);
+    pointer-events:auto;width:min(19vw,10vh);height:min(13vw,6.2vh);padding:0;border-radius:999px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;background:var(--c,#fff);color:#000;border:2px solid var(--c,#fff);
   }
   #ctl button:active{opacity:.55}
   #ctl button:focus-visible{outline:3px solid #fff;outline-offset:3px}
@@ -124,11 +127,20 @@
   #ctl .ip{display:none}
   #app.paused #ctl .ip{display:block}
   #app.paused #ctl .ii{display:none}
-  #app.paused #bPlay{background:var(--cap);color:#000;border-color:var(--cap)}
-  #bStop{color:#FF6B6B;border-color:#FF6B6B}
-  #app.sun #ctl button{background:#fff;color:#101010;border-color:rgba(16,16,16,.7)}
-  #app.sun #bStop{color:#B00020;border-color:#B00020}
-  #app.sun.paused #bPlay{background:#4A3A00;color:#fff;border-color:#4A3A00}
+  #bPlay{--c:#39FF7A}                    /* vert : en marche (⏸) */
+  #app.paused #bPlay{--c:#FF9F1C}        /* orange : en pause (▶), distinct du soleil */
+  #bStop{--c:#FF5A5A}                    /* rouge : arrêt de séance */
+  #bReset{--c:#4FC3FF}                   /* bleu : remise à zéro */
+  #bSun{--c:#FFE45C}                     /* jaune : mode soleil */
+  #bSun svg{width:58%;height:70%}
+  #bSun[aria-pressed=true]{background:#000;color:var(--c)}   /* mode soleil actif : bouton inversé */
+  #app.sun #ctl button{color:#fff}
+  #app.sun #bPlay{--c:#0B6B2C}
+  #app.sun.paused #bPlay{--c:#8A5A00}
+  #app.sun #bStop{--c:#B00020}
+  #app.sun #bReset{--c:#0A4C8A}
+  #app.sun #bSun{--c:#B07A00}
+  #app.sun #bSun[aria-pressed=true]{background:#101010;color:#FFE45C;border-color:#101010}
 
   /* Onglets : barre fixe en bas (superposée : elle ne déplace pas les chiffres) */
   #nav{
@@ -286,6 +298,7 @@
       <button id="bPlay" type="button" aria-label="Pause ou reprise"><svg class="ii" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg><svg class="ip" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 L20 12 L7 20 Z"/></svg></button>
       <button id="bStop" type="button" aria-label="Terminer la séance"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></button>
       <button id="bReset" type="button" aria-label="Remise à zéro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 a8 8 0 1 1 -7.6 5.6 M12 1 L12 7 L7 4 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="bSun" type="button" aria-label="Mode plein soleil" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.6"/><g stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 2.2V5M12 19V21.8M2.2 12H5M19 12H21.8M5.1 5.1L7.1 7.1M16.9 16.9L18.9 18.9M5.1 18.9L7.1 16.9M16.9 7.1L18.9 5.1"/></g></svg></button>
     </div>
     <div id="toast" role="status" hidden></div>
 
@@ -306,7 +319,7 @@
           <h3>Aide</h3>
           <ul>
             <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte.</span></li>
-            <li><b class="c-speed">Boutons ⏸ ■ ↺</b><span>⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, qui est rangée dans l'historique (le trip reste). ↺ : remise à zéro du trip, avec confirmation.</span></li>
+            <li><b class="c-speed">Boutons ⏸ ■ ↺ ☀</b><span>⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, qui est rangée dans l'historique (le trip reste). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
             <li><b class="c-trip">Litres (bateau)</b><span>Consommation estimée. Appui long : calibrage (ou dans Réglages).</span></li>
             <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
           </ul>
@@ -626,13 +639,13 @@
     closeSess();
     toast(ok ? 'Séance terminée et enregistrée' : 'Séance trop courte : non enregistrée');
   });
-  /* Les boutons flottent au milieu de l'espace libre entre le trip et l'heure */
+  /* Les boutons flottent juste au-dessus de la barre d'onglets */
   var elCtl = $('ctl');
   function placeCtl(){
     if (!elCtl || elApp.classList.contains('inmenu')) return;
-    var a = elTrip.getBoundingClientRect(), b = elClock.getBoundingClientRect();
-    if (!a.height || !b.height) return;
-    elCtl.style.top = Math.round((a.bottom + b.top) / 2 - elCtl.offsetHeight / 2) + 'px';
+    var n = $('nav').getBoundingClientRect();
+    if (!n.height) return;
+    elCtl.style.top = Math.round(n.top - elCtl.offsetHeight - Math.max(8, window.innerHeight * 0.008)) + 'px';
   }
   window.addEventListener('resize', placeCtl);
   if (paused) elApp.classList.add('paused');
@@ -641,10 +654,12 @@
   function setSun(v){
     sun = v;
     if (v) elApp.classList.add('sun'); else elApp.classList.remove('sun');
+    $('bSun').setAttribute('aria-pressed', v ? 'true' : 'false');
     try { localStorage.setItem(KEY_S, v ? '1' : '0'); } catch(e){}
   }
   elClock.addEventListener('click', function(){ setSun(!sun); });
-  if (sun) elApp.classList.add('sun');
+  $('bSun').addEventListener('click', function(){ setSun(!sun); });
+  if (sun) { elApp.classList.add('sun'); $('bSun').setAttribute('aria-pressed', 'true'); }
 
   var elHisto = $('histo'), elHistoList = $('histoList');
   document.addEventListener('keydown', function(e){
@@ -944,7 +959,7 @@
     var key = paused ? 'P' : (t ? 'V' : 'A');
     if (elHmsg._k !== key) {
       elHmsg._k = key;
-      elHmsg.textContent = paused ? 'PAUSE' : '';
+      elHmsg.textContent = '';   // plus de mot « PAUSE » : le bouton ▶ jaune et les chiffres gris suffisent
     }
     elHmsg.hidden = showVal;
     elHval.hidden = !showVal;
