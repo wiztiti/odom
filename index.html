@@ -111,6 +111,25 @@
   #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
   #app.sun #no{color:#101010;border-color:rgba(16,16,16,.55)}
 
+  /* Boutons : lecture/pause, arrêt de séance, remise à zéro. Placés entre le trip et l'heure par le script
+     (ils flottent au-dessus de la page : aucun chiffre ne bouge). */
+  #ctl{position:fixed;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:min(5vw,3vh);pointer-events:none}
+  #ctl button{
+    pointer-events:auto;width:min(22vw,11.5vh);height:min(13vw,6.2vh);padding:0;border-radius:999px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;background:#101010;color:#fff;border:2px solid rgba(255,255,255,.6);
+  }
+  #ctl button:active{opacity:.55}
+  #ctl button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  #ctl svg{width:44%;height:62%;fill:currentColor}
+  #ctl .ip{display:none}
+  #app.paused #ctl .ip{display:block}
+  #app.paused #ctl .ii{display:none}
+  #app.paused #bPlay{background:var(--cap);color:#000;border-color:var(--cap)}
+  #bStop{color:#FF6B6B;border-color:#FF6B6B}
+  #app.sun #ctl button{background:#fff;color:#101010;border-color:rgba(16,16,16,.7)}
+  #app.sun #bStop{color:#B00020;border-color:#B00020}
+  #app.sun.paused #bPlay{background:#4A3A00;color:#fff;border-color:#4A3A00}
+
   /* Onglets : barre fixe en bas (superposée : elle ne déplace pas les chiffres) */
   #nav{
     position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;
@@ -227,7 +246,7 @@
       <span id="u1" class="side" aria-label="Unité">km/h</span>
     </section>
 
-    <div class="trip panel scr" id="trip" role="button" tabindex="0" aria-label="Trip : toucher pour remettre à zéro">
+    <div class="trip panel scr" id="trip">
       <section class="row">
         <svg id="km" class="num seg" role="img" aria-label="Distance"></svg>
         <span id="u2" class="side"><small>trip</small><span id="u2u">m</span></span>
@@ -263,6 +282,11 @@
         </span>
       </section>
     </div>
+    <div id="ctl" class="scr">
+      <button id="bPlay" type="button" aria-label="Pause ou reprise"><svg class="ii" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg><svg class="ip" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 L20 12 L7 20 Z"/></svg></button>
+      <button id="bStop" type="button" aria-label="Terminer la séance"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></button>
+      <button id="bReset" type="button" aria-label="Remise à zéro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 a8 8 0 1 1 -7.6 5.6 M12 1 L12 7 L7 4 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
     <div id="toast" role="status" hidden></div>
 
     <div id="menu" hidden>
@@ -282,8 +306,8 @@
           <h3>Aide</h3>
           <ul>
             <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte.</span></li>
-            <li><b class="c-speed">Vitesse</b><span>Toucher : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). La précision se règle dans Réglages.</span></li>
-            <li><b class="c-trip">Trip</b><span>Distance et temps de roulage. Toucher : remise à zéro, avec confirmation. Bateau : litres estimés (appui long : calibrage).</span></li>
+            <li><b class="c-speed">Boutons ⏸ ■ ↺</b><span>⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, qui est rangée dans l'historique (le trip reste). ↺ : remise à zéro du trip, avec confirmation.</span></li>
+            <li><b class="c-trip">Litres (bateau)</b><span>Consommation estimée. Appui long : calibrage (ou dans Réglages).</span></li>
             <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
           </ul>
         </section>
@@ -530,6 +554,7 @@
     showSpeed();
     showKm();
     showRide();
+    if (typeof placeCtl === 'function') placeCtl();
   }
   showRide();
   applyUnit();
@@ -573,14 +598,6 @@
   });
   ['pointercancel','pointerleave'].forEach(function(n){ elRowFuel.addEventListener(n, function(){ clearTimeout(fuelTimer); fuelLong = false; }); });
   elRowFuel.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-  elTrip.addEventListener('click', function(e){
-    if (elConfirm.contains(e.target)) return;
-    if (fuelSwallow) return;   // l'appui long sur les litres ne propose pas la remise à zéro        // les boutons Oui/Non ont leurs propres actions
-    openConfirm();
-  });
-  elTrip.addEventListener('keydown', function(e){
-    if ((e.key === 'Enter' || e.key === ' ') && elConfirm.hidden) { e.preventDefault(); openConfirm(); }
-  });
   elYes.addEventListener('click', function(){
     odo = 0; rideMs = 0; fuel = 0; saveState(); showKm(); showRide(); showFuel(); closeConfirm();
     closeSess();   // la remise à zéro termine la séance en cours
@@ -601,7 +618,23 @@
     clearTimeout(toastT); toastT = setTimeout(function(){ elToast.hidden = true; }, 1800);
   }
   elRowSpeed.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-  elRowSpeed.addEventListener('click', function(){ setPaused(!paused); });
+  $('bPlay').addEventListener('click', function(){ setPaused(!paused); });
+  $('bReset').addEventListener('click', openConfirm);
+  $('bStop').addEventListener('click', function(){
+    if (!sess) { toast('Aucune séance en cours'); return; }
+    var ok = sess.d >= SESS_MIN_M;
+    closeSess();
+    toast(ok ? 'Séance terminée et enregistrée' : 'Séance trop courte : non enregistrée');
+  });
+  /* Les boutons flottent au milieu de l'espace libre entre le trip et l'heure */
+  var elCtl = $('ctl');
+  function placeCtl(){
+    if (!elCtl || elApp.classList.contains('inmenu')) return;
+    var a = elTrip.getBoundingClientRect(), b = elClock.getBoundingClientRect();
+    if (!a.height || !b.height) return;
+    elCtl.style.top = Math.round((a.bottom + b.top) / 2 - elCtl.offsetHeight / 2) + 'px';
+  }
+  window.addEventListener('resize', placeCtl);
   if (paused) elApp.classList.add('paused');
 
   /* ---------- Mode soleil : appui sur l'heure ---------- */
@@ -631,7 +664,7 @@
   }
   function dist(m, u){
     if ((u || unit) === 'nm') return (m / 1852).toFixed(2).replace('.', ',') + ' miles';
-    return m >= 1000 ? (m / 1000).toFixed(2).replace('.', ',') + ' km' : Math.round(m) + ' m';
+    return m >= 1000 ? (Math.round(m / 10) * 10 / 1000).toFixed(3).replace('.', ',') + ' km' : Math.round(m) + ' m';   // km à 3 décimales, arrondi à 10 m
   }
   function spd(kmh, u){
     return (u || unit) === 'nm' ? (kmh / 1.852).toFixed(1).replace('.', ',') + ' knots' : kmh.toFixed(1).replace('.', ',') + ' km/h';
@@ -766,7 +799,7 @@
     var td = 0, tt = 0, tl = 0;
     all.forEach(function(x){ td += x.d; tt += x.t; tl += x.l || 0; });
     $('histoTotal').textContent = all.length
-      ? 'Total : ' + (boat ? (td / 1852).toFixed(1).replace('.', ',') + ' miles' : (td / 1000).toFixed(1).replace('.', ',') + ' km') +
+      ? 'Total : ' + (boat ? (td / 1852).toFixed(1).replace('.', ',') + ' miles' : (Math.round(td / 10) * 10 / 1000).toFixed(3).replace('.', ',') + ' km')   /* 3 décimales, arrondi à 10 m : la dernière est toujours 0 */ +
         ' · ' + hhmm(tt) + (boat && tl > 0 ? ' · ' + fl(tl) : '')
       : '';
     if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune sortie ' + (boat ? 'en bateau' : 'à vélo') + ' enregistrée pour l\'instant.</p>'; renderBar(); return; }
@@ -865,9 +898,12 @@
     elMenu.hidden = t !== 'menu';
     if (t === 'menu') { elHisto.hidden = true; elMenuHome.hidden = false; refreshSettings(); elMenu.scrollTop = 0; }
     Object.keys(NAV).forEach(function(k){ $(NAV[k]).setAttribute('aria-selected', k === t ? 'true' : 'false'); });
+    placeCtl();
   }
   Object.keys(NAV).forEach(function(k){ $(NAV[k]).addEventListener('click', function(){ showTab(k); }); });
   showTab(act);
+  placeCtl();
+  setTimeout(placeCtl, 300);
 
   /* ---------- Heure hh:mm (24 h) ---------- */
   var lastT = '';
