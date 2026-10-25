@@ -346,8 +346,8 @@
         <section class="card2">
           <h3>Réglages</h3>
           <div class="set"><span>Mode plein soleil</span><button id="setSun" type="button"></button></div>
-          <div class="set"><span>Vitesse vélo</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button></div></div>
-          <div class="set"><span>Vitesse bateau</span><div class="seg3" data-act="boat"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button></div></div>
+          <div class="set"><span>Vitesse vélo</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
+          <div class="set"><span>Vitesse bateau</span><div class="seg3" data-act="boat"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
           <div class="set"><span>Calibrage conso <small id="calVal"></small></span><button id="setCal" type="button">Régler</button></div>
         </section>
 
@@ -391,7 +391,7 @@
   var RESUME_MS = 5000;//   ...pendant 5 s relance le comptage tout seul (mode km/h seulement)
   var KEY_P = 'compteur-velo-pause';  // pause en cours : '1' ou '0'
   var KEY_S = 'compteur-velo-soleil'; // mode soleil : '1' ou '0'
-  var KEY_PR = 'compteur-velo-precision'; // 'd1' | 'd2' | 'plus'
+  var KEY_PR = 'compteur-velo-precision'; // 'd1' | 'd2' | 'plus' | 'int'
   var KEY_H = 'compteur-velo-histo';  // historique : liste des séances terminées
   var KEY_C = 'compteur-velo-seance'; // séance en cours
   var SESS_GAP_MS = 60 * 60 * 1000;   // 1 h sans rouler : la séance est terminée
@@ -484,9 +484,10 @@
 
   /* ---------- Formats ---------- */
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
-  // Précision de la vitesse (appui long sur la vitesse) : 'd1' = 0,1 · 'd2' = décimales paires · 'plus' = entier, « + » dès x,5
+  // Précision de la vitesse (appui long sur la vitesse) : 'd1' = 0,1 · 'd2' = décimales paires · 'int' = entier seul · 'plus' = entier, « + » dès x,5
   // d2 et plus tronquent (jamais au-dessus de la vitesse réelle).
   function fmtSpeed(v){
+    if (speedMode === 'int')  return String(Math.floor(v + 1e-9));
     if (speedMode === 'plus') { var n = Math.floor(v * 2 + 1e-9); return Math.floor(n / 2) + (n % 2 ? '+' : '_'); }
     if (speedMode === 'd2')   { var q = Math.floor(v * 10 + 1e-9); q -= q % 2; return Math.floor(q / 10) + '.' + (q % 10); }
     return v.toFixed(1);
@@ -522,7 +523,7 @@
     store.boat.m = +store.boat.m || 0; store.boat.t = +store.boat.t || 0; store.boat.l = +store.boat.l || 0;
     var tb = localStorage.getItem(KEY_TAB);
     act = (tb === 'boat' || tb === 'bike') ? tb : legacyAct;
-    var okm = function(v){ return v === 'd1' || v === 'd2' || v === 'plus'; };
+    var okm = function(v){ return v === 'd1' || v === 'd2' || v === 'plus' || v === 'int'; };
     var pm = JSON.parse(localStorage.getItem(KEY_PM) || 'null');
     if (pm && okm(pm.bike) && okm(pm.boat)) modes = pm;
     else { var oldm = localStorage.getItem(KEY_PR); if (okm(oldm)) modes.boat = oldm; }   // le bateau garde l'ancien réglage, le vélo passe à 0,2
