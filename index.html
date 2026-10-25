@@ -102,7 +102,7 @@
     content:"";position:absolute;inset:-2.4vh 4vw;border-radius:24px;background:var(--panel);z-index:-1;
   }
   #rowSpeed{--panel:var(--panel-speed);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
-  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 66px + min(13vw,6.2vh) + 28px);transform:translateX(-50%);z-index:20;
+  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 66px + min(9vw,4.4vh) + 28px);transform:translateX(-50%);z-index:20;
     background:#222;color:#fff;border:1px solid #666;border-radius:10px;padding:.55em 1em;font-size:min(4vw,2.4vh);white-space:nowrap}
   #app.sun #toast{background:#fff;color:#000;border-color:#000}
   .trip{--panel:var(--panel-trip)}
@@ -117,7 +117,7 @@
 
   /* Compas du bateau (onglet Bateau) : rose classique qui tourne derrière une ligne de foi fixe ; vitesse au centre */
   #app.boat{--D:min(92vw,42vh);--sp-h:calc(var(--D) * .26);
-    padding-bottom:calc(66px + min(13vw,6.2vh) + 18px)}   /* la place des boutons et de la barre d'onglets est réservée */
+    padding-bottom:calc(66px + min(9vw,4.4vh) + 18px)}   /* la place des boutons et de la barre d'onglets est réservée */
   #topBlock{width:100%}
   #dial,#dialHd,#timeB{display:none}
   #app.boat #dial{display:block;grid-area:1/1;width:var(--D);height:var(--D)}
@@ -144,10 +144,12 @@
   /* Boutons : lecture/pause, arrêt de séance, remise à zéro, mode soleil. Placés juste au-dessus de la barre d'onglets
      par le script (ils flottent au-dessus de la page : aucun chiffre ne bouge). */
   #ctl{position:fixed;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:min(3vw,1.6vh);pointer-events:none}
-  /* Boutons pleins et colorés, icônes noires : bien visibles au soleil */
+  /* Boutons discrets : petits, fond sombre, fine bordure et icône colorées ; ils s'estompent tout seuls pendant que ça compte */
+  #ctl{transition:opacity .7s}
+  #app:not(.idle):not(.paused) #ctl:not(.on){opacity:.4}
   #ctl button{
-    pointer-events:auto;width:min(19vw,10vh);height:min(13vw,6.2vh);padding:0;border-radius:999px;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;background:var(--c,#fff);color:#000;border:2px solid var(--c,#fff);
+    pointer-events:auto;width:min(15vw,8vh);height:min(9vw,4.4vh);padding:0;border-radius:999px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;background:#0b0b0b;color:var(--c,#fff);border:1.5px solid var(--c,#fff);
   }
   #ctl button:active{opacity:.55}
   #ctl button:focus-visible{outline:3px solid #fff;outline-offset:3px}
@@ -161,14 +163,15 @@
   #bReset{--c:#4FC3FF}                   /* bleu : remise à zéro */
   #bSun{--c:#FFE45C}                     /* jaune : mode soleil */
   #bSun svg{width:58%;height:70%}
-  #bSun[aria-pressed=true]{background:#000;color:var(--c)}   /* mode soleil actif : bouton inversé */
-  #app.sun #ctl button{color:#fff}
+  #bSun[aria-pressed=true]{background:var(--c);color:#000}   /* mode soleil actif : bouton plein */
+  #app.sun #ctl button{background:#fff;color:var(--c)}
   #app.sun #bPlay{--c:#0B6B2C}
   #app.sun.paused #bPlay,#app.sun.idle #bPlay{--c:#8A5A00}
   #app.sun #bStop{--c:#B00020}
   #app.sun #bReset{--c:#0A4C8A}
   #app.sun #bSun{--c:#B07A00}
   #app.sun #bSun[aria-pressed=true]{background:#101010;color:#FFE45C;border-color:#101010}
+  #app.sun #ctl:not(.on){--dimmed:1}
 
   /* Onglets : barre fixe en bas (superposée : elle ne déplace pas les chiffres) */
   #nav{
@@ -700,6 +703,15 @@
     }
   }
   window.addEventListener('resize', placeCtl);
+  /* Les boutons s'estompent au bout de 4 s sans toucher (seulement pendant que ça compte) et se rallument au moindre contact */
+  var ctlTimer = 0;
+  function wakeCtl(){
+    elCtl.classList.add('on');
+    clearTimeout(ctlTimer);
+    ctlTimer = setTimeout(function(){ elCtl.classList.remove('on'); }, 4000);
+  }
+  document.addEventListener('pointerdown', wakeCtl, true);
+  wakeCtl();
   elApp.classList.toggle('paused', runState === 'pause'); elApp.classList.toggle('idle', runState === 'idle');
 
   /* ---------- Mode soleil : appui sur l'heure ---------- */
