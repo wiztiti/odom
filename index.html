@@ -173,6 +173,35 @@
   #app.sun #bSun[aria-pressed=true]{background:#101010;color:#FFE45C;border-color:#101010}
   #app.sun #ctl:not(.on){--dimmed:1}
 
+  /* Bouton « position » (bateau seulement) : rose, à côté des quatre autres */
+  #ctl #bPos{display:none;--c:#FF6BD6}
+  #app.boat #ctl #bPos{display:flex}
+  #app.sun #bPos{--c:#A0148C}
+  #bPos svg{width:50%;height:70%}
+
+  /* Écran « Position » : plein écran, gros caractères, à lire ou à dicter aux secours. Un appui n'importe où le ferme. */
+  #pos{position:fixed;inset:0;z-index:30;background:#000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:1.6vh;padding:2vh 3vw;box-sizing:border-box;text-align:center;font-family:ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;
+    -webkit-user-select:none;user-select:none;cursor:pointer}
+  #pos[hidden]{display:none}
+  #pos .pl{font-size:min(4.2vw,2.3vh);letter-spacing:.14em;text-transform:uppercase;color:#9aa4ab;margin-bottom:-.6vh}
+  #pos .pv{font-size:min(11.2vw,6vh);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #pos .pg{margin-top:1.2vh}
+  #pos .pd{font-size:min(5.6vw,3vh);font-weight:700;font-variant-numeric:tabular-nums;color:#c9d1d6;white-space:nowrap}
+  #pos .pr{font-size:min(6.4vw,3.4vh);font-weight:700;font-variant-numeric:tabular-nums;color:#FFE45C;white-space:nowrap}
+  #pos .pt{display:flex;gap:6vw;justify-content:center;margin-top:1.4vh}
+  #pos .pt div{font-size:min(8vw,4.4vh);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #pos .pt small{display:block;font-size:min(3.6vw,2vh);font-weight:600;letter-spacing:.12em;color:#9aa4ab;text-transform:uppercase}
+  #pos .pa{font-size:min(5vw,2.7vh);font-weight:700;color:#7CFF9E}
+  #pos .pa.bad{color:#FF5A5A}
+  #pos .ph{font-size:min(3.8vw,2vh);color:#7d878e;margin-top:1.2vh}
+  #app.sun #pos{background:#FFFBEB;color:#101010}
+  #app.sun #pos .pl,#app.sun #pos .pt small,#app.sun #pos .ph{color:#5b5230}
+  #app.sun #pos .pd{color:#2a2a2a}
+  #app.sun #pos .pr{color:#4A3A00}
+  #app.sun #pos .pa{color:#0B6B2C}
+  #app.sun #pos .pa.bad{color:#B00020}
+
   /* Onglets : barre fixe en bas (superposée : elle ne déplace pas les chiffres) */
   #nav{
     position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;
@@ -334,9 +363,19 @@
       <button id="bPlay" type="button" aria-label="Pause ou reprise"><svg class="ii" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg><svg class="ip" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 L20 12 L7 20 Z"/></svg></button>
       <button id="bStop" type="button" aria-label="Terminer la séance"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></button>
       <button id="bReset" type="button" aria-label="Remise à zéro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 a8 8 0 1 1 -7.6 5.6 M12 1 L12 7 L7 4 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="bPos" type="button" aria-label="Afficher ma position"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg></button>
       <button id="bSun" type="button" aria-label="Mode plein soleil" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.6"/><g stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 2.2V5M12 19V21.8M2.2 12H5M19 12H21.8M5.1 5.1L7.1 7.1M16.9 16.9L18.9 18.9M5.1 18.9L7.1 16.9M16.9 7.1L18.9 5.1"/></g></svg></button>
     </div>
     <div id="toast" role="status" hidden></div>
+    <div id="pos" hidden role="dialog" aria-label="Position actuelle">
+      <div class="pl">Latitude</div><div class="pv" id="pLat">--</div>
+      <div class="pl pg">Longitude</div><div class="pv" id="pLon">--</div>
+      <div class="pd" id="pDec"></div>
+      <div class="pr" id="pRte"></div>
+      <div class="pt"><div><small>Heure locale</small><span id="pLoc">--:--</span></div><div><small>Heure UTC</small><span id="pUtc">--:--</span></div></div>
+      <div class="pa" id="pAge"></div>
+      <div class="ph">Touche l'écran pour revenir</div>
+    </div>
 
     <div id="menu" hidden>
       <div id="menuHome" class="wrap">
@@ -1074,6 +1113,48 @@
   }
   setHead('');
 
+  /* ---------- Écran « Position » (bateau) ---------- */
+  var elPos = $('pos'), posOpenedAt = 0, posTimer = 0;
+  function fmtDM(v, deg3, pos, neg){      // degrés + minutes décimales : 42° 41,234' N
+    var a = Math.abs(v), d = Math.floor(a), m = Math.round((a - d) * 60 * 1000) / 1000;
+    if (m >= 60) { d += 1; m = 0; }
+    var ds = String(d); while (ds.length < (deg3 ? 3 : 2)) ds = '0' + ds;
+    var ms = m.toFixed(3).replace('.', ','); if (m < 10) ms = '0' + ms;
+    return ds + '° ' + ms + "' " + (v < 0 ? neg : pos);
+  }
+  function renderPos(){
+    var f = posFix, now = new Date();
+    $('pLoc').textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    $('pUtc').textContent = pad2(now.getUTCHours()) + ':' + pad2(now.getUTCMinutes());
+    var age = $('pAge');
+    if (!f) {
+      $('pLat').textContent = '--'; $('pLon').textContent = '--'; $('pDec').textContent = ''; $('pRte').textContent = '';
+      age.textContent = 'Pas de position GPS'; age.className = 'pa bad'; return;
+    }
+    var sec = Math.max(0, Math.round((Date.now() - f.at) / 1000));
+    $('pLat').textContent = fmtDM(f.lat, false, 'N', 'S');
+    $('pLon').textContent = fmtDM(f.lon, true, 'E', 'W');
+    $('pDec').textContent = f.lat.toFixed(5).replace('.', ',') + '  ' + f.lon.toFixed(5).replace('.', ',');
+    var moving = f.spd !== null && f.spd * 1.94384 >= 0.5;
+    var rte = 'Route ' + ((moving && f.hd !== null) ? ('000' + Math.round(f.hd) % 360).slice(-3) + '°' : '—');
+    var kn = f.spd === null ? '—' : (f.spd * 1.94384).toFixed(1).replace('.', ',') + ' nœuds';
+    $('pRte').textContent = rte + '  ·  ' + kn;
+    var txt = sec < 3 ? 'GPS à l\'instant' : 'GPS il y a ' + (sec < 120 ? sec + ' s' : Math.round(sec / 60) + ' min');
+    txt += ' · ± ' + Math.round(f.acc) + ' m';
+    age.textContent = txt; age.className = 'pa' + ((sec > 10 || f.acc > 50) ? ' bad' : '');
+  }
+  function openPos(){
+    renderPos(); elPos.hidden = false; posOpenedAt = Date.now();
+    clearInterval(posTimer); posTimer = setInterval(renderPos, 1000);
+  }
+  function closePos(){
+    if (elPos.hidden || Date.now() - posOpenedAt < 400) return;
+    elPos.hidden = true; clearInterval(posTimer);
+  }
+  $('bPos').addEventListener('click', openPos);
+  elPos.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); closePos(); });
+  document.addEventListener('keydown', function(){ closePos(); });
+
   /* ---------- Géométrie ---------- */
   function hav(lat1, lon1, lat2, lon2){
     var R = 6371000, rad = Math.PI / 180;
@@ -1098,9 +1179,14 @@
     return dw >= Math.max(3, c.accuracy * 0.6) ? dw / dtw : 0;   // en dessous : bruit GPS, on est à l'arrêt
   }
 
+  var posFix = null;   // dernière position reçue (pour l'écran « Position »)
   function onPos(p){
     var c = p.coords;
     lastCall = Date.now();
+    posFix = { lat: c.latitude, lon: c.longitude, acc: c.accuracy,
+               spd: (typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0) ? c.speed : null,
+               hd: (typeof c.heading === 'number' && isFinite(c.heading)) ? c.heading : null, at: Date.now() };
+    if (!elPos.hidden) renderPos();
     var accOk = c.accuracy <= MAX_ACC;
     var hasSpeed = typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0;   // vitesse mesurée par le GPS (m/s)
 
