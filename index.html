@@ -187,7 +187,8 @@
   #pos .pl{font-size:min(4.2vw,2.3vh);letter-spacing:.14em;text-transform:uppercase;color:#9aa4ab;margin-bottom:-.6vh}
   #pos .pv{font-size:min(11.2vw,6vh);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
   #pos .pg{margin-top:1.2vh}
-  #pos .pd{font-size:min(5.6vw,3vh);font-weight:700;font-variant-numeric:tabular-nums;color:#c9d1d6;white-space:nowrap}
+  #pos .ps{font-size:min(5.4vw,2.9vh);font-weight:700;line-height:1.2;color:#FFE45C;max-width:94vw}
+  #app.sun #pos .ps{color:#4A3A00}
   #pos .pr{font-size:min(6.4vw,3.4vh);font-weight:700;font-variant-numeric:tabular-nums;color:#FFE45C;white-space:nowrap}
   #pos .pt{display:flex;gap:6vw;justify-content:center;margin-top:1.4vh}
   #pos .pt div{font-size:min(8vw,4.4vh);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -197,7 +198,6 @@
   #pos .ph{font-size:min(3.8vw,2vh);color:#7d878e;margin-top:1.2vh}
   #app.sun #pos{background:#FFFBEB;color:#101010}
   #app.sun #pos .pl,#app.sun #pos .pt small,#app.sun #pos .ph{color:#5b5230}
-  #app.sun #pos .pd{color:#2a2a2a}
   #app.sun #pos .pr{color:#4A3A00}
   #app.sun #pos .pa{color:#0B6B2C}
   #app.sun #pos .pa.bad{color:#B00020}
@@ -368,9 +368,8 @@
     </div>
     <div id="toast" role="status" hidden></div>
     <div id="pos" hidden role="dialog" aria-label="Position actuelle">
-      <div class="pl">Latitude</div><div class="pv" id="pLat">--</div>
-      <div class="pl pg">Longitude</div><div class="pv" id="pLon">--</div>
-      <div class="pd" id="pDec"></div>
+      <div class="pl">Latitude</div><div class="pv" id="pLat">--</div><div class="ps" id="pSayA"></div>
+      <div class="pl pg">Longitude</div><div class="pv" id="pLon">--</div><div class="ps" id="pSayO"></div>
       <div class="pr" id="pRte"></div>
       <div class="pt"><div><small>Heure locale</small><span id="pLoc">--:--</span></div><div><small>Heure UTC</small><span id="pUtc">--:--</span></div></div>
       <div class="pa" id="pAge"></div>
@@ -1115,12 +1114,22 @@
 
   /* ---------- Écran « Position » (bateau) ---------- */
   var elPos = $('pos'), posOpenedAt = 0, posTimer = 0;
-  function fmtDM(v, deg3, pos, neg){      // degrés + minutes décimales : 42° 41,234' N
+  function dmParts(v, deg3){
     var a = Math.abs(v), d = Math.floor(a), m = Math.round((a - d) * 60 * 1000) / 1000;
     if (m >= 60) { d += 1; m = 0; }
     var ds = String(d); while (ds.length < (deg3 ? 3 : 2)) ds = '0' + ds;
-    var ms = m.toFixed(3).replace('.', ','); if (m < 10) ms = '0' + ms;
-    return ds + '° ' + ms + "' " + (v < 0 ? neg : pos);
+    var mf = m.toFixed(3); if (m < 10) mf = '0' + mf;
+    return { ds: ds, mi: mf.split('.')[0], mf: mf.split('.')[1] };
+  }
+  function fmtDM(v, deg3, pos, neg){      // degrés + minutes décimales : 42° 41,234' N
+    var q = dmParts(v, deg3);
+    return q.ds + '° ' + q.mi + ',' + q.mf + "' " + (v < 0 ? neg : pos);
+  }
+  var WORDS = ['zéro','un','deux','trois','quatre','cinq','six','sept','huit','neuf'];
+  function say(str){ return str.split('').map(function(c){ return WORDS[+c]; }).join('-'); }
+  function fmtSay(v, deg3, pos, neg){     // comme on l'annonce : « quatre-deux degrés, quatre-un virgule deux-quatre-huit minutes Nord »
+    var q = dmParts(v, deg3);
+    return say(q.ds) + ' degrés, ' + say(q.mi) + ' virgule ' + say(q.mf) + ' minutes ' + (v < 0 ? neg : pos);
   }
   function renderPos(){
     var f = posFix, now = new Date();
@@ -1128,13 +1137,14 @@
     $('pUtc').textContent = pad2(now.getUTCHours()) + ':' + pad2(now.getUTCMinutes());
     var age = $('pAge');
     if (!f) {
-      $('pLat').textContent = '--'; $('pLon').textContent = '--'; $('pDec').textContent = ''; $('pRte').textContent = '';
+      $('pLat').textContent = '--'; $('pLon').textContent = '--'; $('pSayA').textContent = ''; $('pSayO').textContent = ''; $('pRte').textContent = '';
       age.textContent = 'Pas de position GPS'; age.className = 'pa bad'; return;
     }
     var sec = Math.max(0, Math.round((Date.now() - f.at) / 1000));
     $('pLat').textContent = fmtDM(f.lat, false, 'N', 'S');
     $('pLon').textContent = fmtDM(f.lon, true, 'E', 'W');
-    $('pDec').textContent = f.lat.toFixed(5).replace('.', ',') + '  ' + f.lon.toFixed(5).replace('.', ',');
+    $('pSayA').textContent = fmtSay(f.lat, false, 'Nord', 'Sud');
+    $('pSayO').textContent = fmtSay(f.lon, true, 'Est', 'Ouest');
     var moving = f.spd !== null && f.spd * 1.94384 >= 0.5;
     var rte = 'Route ' + ((moving && f.hd !== null) ? ('000' + Math.round(f.hd) % 360).slice(-3) + '°' : '—');
     var kn = f.spd === null ? '—' : (f.spd * 1.94384).toFixed(1).replace('.', ',') + ' nœuds';
