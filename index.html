@@ -1,4 +1,1297 @@
-<!doctype html>
+<!doctype html><!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Vélo">
+<title>Compteur Vélo</title>
+<style>
+  /* Fond noir pur, couleurs saturées et lumineuses pour rester lisibles en plein soleil */
+  :root{
+    --bg:#000000;
+    --speed:#4FC3FF;   /* bleu ciel vif */
+    --km:#39FF7A;      /* vert vif */
+    --time:#FFFFFF;
+    --cap:#FFE45C;     /* jaune clair : cap, très lumineux en plein soleil */
+    --ride:#FFB8F0;    /* rose clair : temps de roulage, lisible en plein soleil */
+    --paused:#7c8890; --fuel:#FFA94D;  /* gris : valeurs figées pendant la pause */
+    --panel-speed:#D6EEFF;   /* cadrans du mode soleil : bleu très clair, */
+    --panel-trip:#D8F6DF;    /*   vert très clair, */
+    --panel-clock:#FFF3BF;   /*   jaune très clair */
+    --sp-h:min(29vw,18vh);   /* hauteur des chiffres de la vitesse */
+    --dim:#9a9a9a;
+    --dial-bg:#070707; --dial-ink:#FFFFFF; --dial-rim:#3c3c3c; --lubber:#FF3B30;   /* compas du bateau */
+  }
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--time)}
+  body{
+    font-family:ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;
+    display:flex;flex-direction:column;align-items:center;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    box-sizing:border-box;overflow:hidden;
+    -webkit-user-select:none;user-select:none;touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  main{flex:1;width:100%;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;
+       box-sizing:border-box;padding-bottom:3.2vh}   /* petite réserve en bas : les boutons posés sur la barre d'onglets ne touchent pas le cap */
+
+  /* Les chiffres sont dans la colonne centrale, donc centrés sur l'écran ; unités et cap sont à droite */
+  .row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:baseline;column-gap:2vw;width:100%;white-space:nowrap;line-height:1}
+  .num{grid-column:2;justify-self:center}
+  .side{grid-column:3;justify-self:start}
+
+  /* Chiffres à segments : les segments éteints restent visibles en filigrane, comme sur un cadran LCD */
+  .seg{display:block;fill:currentColor;overflow:visible}
+  .seg .off{opacity:.09}
+
+  #speed{height:var(--sp-h);color:var(--speed)}
+  /* L'unité (km/h ou knots) suit l'onglet. Centrée sur la vitesse puis descendue d'un peu plus d'un cinquième de sa hauteur. */
+  #u1{
+    align-self:center;transform:translateY(calc(var(--sp-h) * .22));
+    font:inherit;font-size:min(4.6vw,2.8vh);font-weight:700;line-height:1;color:var(--speed);
+    background:none;border:0;padding:.5em .6em;margin-left:-.2em;cursor:default;
+  }
+  #u1:active{opacity:.55}
+  #u1:focus-visible{outline:3px solid #fff;outline-offset:2px}
+
+  #km{height:min(14vw,9vh);color:var(--km)}
+  /* Bloc trip : distance + temps de roulage, rapprochés */
+  .trip,.clock{width:100%;display:flex;flex-direction:column;align-items:center;gap:1.4vh}
+  .clock{gap:5vh}
+  /* Un appui sur le bloc trip propose la remise à zéro */
+  .trip{position:relative;cursor:pointer}
+  .trip:focus-visible{outline:3px solid #fff;outline-offset:4px}
+  #confirm{
+    position:absolute;left:0;right:0;top:-1.5vh;bottom:-1.5vh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.6vh;
+    background:var(--bg);cursor:default;
+  }
+  #confirm p{margin:0;font-size:min(6vw,3.8vh);font-weight:700;color:var(--km)}
+  #confirm .btns{display:flex;gap:4vw}
+  #confirm button{
+    font:inherit;font-size:min(5vw,3.2vh);font-weight:800;letter-spacing:.04em;
+    min-width:min(28vw,16vh);padding:.55em 1em;border-radius:999px;cursor:pointer;
+  }
+  #yes{background:var(--km);color:#000;border:2px solid var(--km)}
+  #no{background:transparent;color:var(--time);border:2px solid rgba(255,255,255,.6)}
+  #confirm button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  /* "trip" au-dessus de "km", en plus petit ; le bas de "km" s'aligne sur le bas des chiffres */
+  #u2,#u3{
+    display:flex;flex-direction:column;align-items:flex-start;gap:.3em;align-self:end;margin-bottom:-.2em;
+    font-size:min(4vw,2.5vh);font-weight:700;color:var(--km);line-height:1;
+  }
+  #u3{color:var(--fuel)}
+  #u2 small,#u3 small{font-size:.55em;font-weight:700;letter-spacing:.08em}
+
+  #ride{height:min(9.5vw,6vh);color:var(--ride)}
+  #fuel{height:min(8vw,5vh);color:var(--fuel)}
+  #rowFuel{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  /* Pause manuelle : vitesse, distance et temps passent en gris, "PAUSE" remplace le cap */
+  #app.paused #speed,#app.paused #km,#app.paused #ride,#app.paused #fuel{color:var(--paused)}
+  #app.idle #km,#app.idle #ride,#app.idle #fuel{color:var(--paused)}   /* arrêté : compteurs en gris, la vitesse reste en couleur */
+  #speed{cursor:pointer}
+
+  /* Mode soleil (appui sur l'heure) : trois cadrans clairs derrière les blocs, chiffres foncés.
+     Les cadrans sont dessinés derrière le contenu : aucun affichage ne bouge. */
+  .panel{position:relative;isolation:isolate}
+  #app.sun .panel::before{
+    content:"";position:absolute;inset:-2.4vh 4vw;border-radius:24px;background:var(--panel);z-index:-1;
+  }
+  #rowSpeed{--panel:var(--panel-speed);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+  #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 66px + min(9vw,4.4vh) + 28px);transform:translateX(-50%);z-index:20;
+    background:#222;color:#fff;border:1px solid #666;border-radius:10px;padding:.55em 1em;font-size:min(4vw,2.4vh);white-space:nowrap}
+  #app.sun #toast{background:#fff;color:#000;border-color:#000}
+  .trip{--panel:var(--panel-trip)}
+  .clock{--panel:var(--panel-clock);cursor:pointer}
+  #app.sun{--dial-bg:#FFFBEB;--dial-ink:#101010;--dial-rim:#6b5a20;--lubber:#C4001A;--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
+  #app.sun .seg .off{opacity:.045}
+  #app.sun .clock::before{inset:-1.2vh 4vw -0.45vh}   /* cadran de l'heure un peu moins haut en bas, pour laisser la place aux boutons */
+  #app.sun #confirm{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
+  #app.sun #confirm p{color:var(--km)}
+  #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
+  #app.sun #no{color:#101010;border-color:rgba(16,16,16,.55)}
+
+  /* Compas du bateau (onglet Bateau) : rose classique qui tourne derrière une ligne de foi fixe ; vitesse au centre */
+  #app.boat{--D:min(92vw,42vh);--sp-h:calc(var(--D) * .26);
+    padding-bottom:calc(66px + min(9vw,4.4vh) + 18px)}   /* la place des boutons et de la barre d'onglets est réservée */
+  #topBlock{width:100%}
+  #dial,#dialHd,#timeB{display:none}
+  #app.boat #dial{display:block;grid-area:1/1;width:var(--D);height:var(--D)}
+  #app.boat #dialHd{display:block;position:absolute;z-index:3;left:50%;top:calc(var(--D) * .205);transform:translateX(-50%);height:calc(var(--D) * .115);color:var(--cap);
+    background:var(--dial-bg);box-shadow:0 0 0 calc(var(--D) * .012) var(--dial-bg),0 0 calc(var(--D) * .03) calc(var(--D) * .018) var(--dial-bg)}   /* fenêtre du cap : masque les lettres qui passent derrière */
+  #app.boat #timeB{display:block;position:fixed;z-index:4;left:calc(env(safe-area-inset-left) + 4vw);top:calc(env(safe-area-inset-top) + 1.6vh);height:min(7.4vw,3.6vh);color:#fff}
+  #app.boat #topBlock{position:relative;display:grid;place-items:center;width:var(--D);height:var(--D)}
+  #app.boat #rowSpeed{grid-area:1/1;z-index:2;width:auto;display:flex;flex-direction:column;align-items:center;gap:calc(var(--D) * .025);margin-top:calc(var(--D) * .085)}
+  #app.boat #rowSpeed::before{display:none}
+  #app.boat #u1{transform:none;margin:0;padding:0;align-self:auto;font-size:calc(var(--D) * .058)}
+  #app.boat .clock{display:none}
+  #app.boat #km{height:min(10.5vw,6.2vh)}
+  #app.boat #ride{height:min(7.6vw,4.5vh)}
+  #app.boat #fuel{height:min(7vw,4.1vh)}
+  #app.boat .trip{gap:1.1vh}
+  #dial .d-bg{fill:var(--dial-bg);stroke:var(--dial-rim);stroke-width:4}
+  #dial .d-t{stroke:var(--dial-ink);fill:none}
+  #dial .d-n{fill:var(--dial-ink);font:700 19px ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;text-anchor:middle}
+  #dial .d-c{fill:var(--cap);font:800 44px ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;text-anchor:middle}
+  #dial .d-l{fill:var(--lubber);stroke:var(--dial-bg);stroke-width:2.5;stroke-linejoin:round}
+  #rose{transition:transform .7s ease-out}
+  #dial.stale #rose,#dialHd.stale{opacity:.5}
+
+  /* Boutons : lecture/pause, arrêt de séance, remise à zéro, mode soleil. Placés juste au-dessus de la barre d'onglets
+     par le script (ils flottent au-dessus de la page : aucun chiffre ne bouge). */
+  #ctl{position:fixed;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:min(3vw,1.6vh);pointer-events:none}
+  /* Boutons discrets : petits, fond sombre, fine bordure et icône colorées ; ils s'estompent tout seuls pendant que ça compte */
+  #ctl{transition:opacity .7s}
+  #app:not(.idle):not(.paused) #ctl:not(.on){opacity:.4}
+  #ctl button{
+    pointer-events:auto;width:min(15vw,8vh);height:min(9vw,4.4vh);padding:0;border-radius:999px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;background:#0b0b0b;color:var(--c,#fff);border:1.5px solid var(--c,#fff);
+  }
+  #ctl button:active{opacity:.55}
+  #ctl button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  #ctl svg{width:44%;height:62%;fill:currentColor}
+  #ctl .ip{display:none}
+  #app.paused #ctl .ip,#app.idle #ctl .ip{display:block}
+  #app.paused #ctl .ii,#app.idle #ctl .ii{display:none}
+  #bPlay{--c:#39FF7A}                    /* vert : en marche (⏸) */
+  #app.paused #bPlay,#app.idle #bPlay{--c:#FF9F1C}        /* orange : en pause (▶), distinct du soleil */
+  #bStop{--c:#FF5A5A}                    /* rouge : arrêt de séance */
+  #bReset{--c:#4FC3FF}                   /* bleu : remise à zéro */
+  #bSun{--c:#FFE45C}                     /* jaune : mode soleil */
+  #bSun svg{width:58%;height:70%}
+  #bSun[aria-pressed=true]{background:var(--c);color:#000}   /* mode soleil actif : bouton plein */
+  #app.sun #ctl button{background:#fff;color:var(--c)}
+  #app.sun #bPlay{--c:#0B6B2C}
+  #app.sun.paused #bPlay,#app.sun.idle #bPlay{--c:#8A5A00}
+  #app.sun #bStop{--c:#B00020}
+  #app.sun #bReset{--c:#0A4C8A}
+  #app.sun #bSun{--c:#B07A00}
+  #app.sun #bSun[aria-pressed=true]{background:#101010;color:#FFE45C;border-color:#101010}
+  #app.sun #ctl:not(.on){--dimmed:1}
+
+  /* Bouton « position » (bateau seulement) : rose, à côté des quatre autres */
+  #ctl #bPos{display:none;--c:#FF6BD6}
+  #app.boat #ctl #bPos{display:flex}
+  #app.sun #bPos{--c:#A0148C}
+  #bPos svg{width:50%;height:70%}
+
+  /* Écran « Position » : plein écran, gros caractères, à lire ou à dicter aux secours. Un appui n'importe où le ferme. */
+  #pos{position:fixed;inset:0;z-index:30;background:#000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:1.6vh;padding:2vh 3vw;box-sizing:border-box;text-align:center;font-family:ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;
+    -webkit-user-select:none;user-select:none;cursor:pointer}
+  #pos[hidden]{display:none}
+  #pos .pl{font-size:min(4.2vw,2.3vh);letter-spacing:.14em;text-transform:uppercase;color:#9aa4ab;margin-bottom:-.6vh}
+  #pos .pv{font-size:min(11.2vw,6vh);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #pos .pg{margin-top:1.2vh}
+  #pos .pd{font-size:min(5.6vw,3vh);font-weight:700;font-variant-numeric:tabular-nums;color:#c9d1d6;white-space:nowrap}
+  #pos .pr{font-size:min(6.4vw,3.4vh);font-weight:700;font-variant-numeric:tabular-nums;color:#FFE45C;white-space:nowrap}
+  #pos .pt{display:flex;gap:6vw;justify-content:center;margin-top:1.4vh}
+  #pos .pt div{font-size:min(8vw,4.4vh);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #pos .pt small{display:block;font-size:min(3.6vw,2vh);font-weight:600;letter-spacing:.12em;color:#9aa4ab;text-transform:uppercase}
+  #pos .pa{font-size:min(5vw,2.7vh);font-weight:700;color:#7CFF9E}
+  #pos .pa.bad{color:#FF5A5A}
+  #pos .ph{font-size:min(3.8vw,2vh);color:#7d878e;margin-top:1.2vh}
+  #app.sun #pos{background:#FFFBEB;color:#101010}
+  #app.sun #pos .pl,#app.sun #pos .pt small,#app.sun #pos .ph{color:#5b5230}
+  #app.sun #pos .pd{color:#2a2a2a}
+  #app.sun #pos .pr{color:#4A3A00}
+  #app.sun #pos .pa{color:#0B6B2C}
+  #app.sun #pos .pa.bad{color:#B00020}
+
+  /* Onglets : barre fixe en bas (superposée : elle ne déplace pas les chiffres) */
+  #nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;
+    padding:6px 8px calc(env(safe-area-inset-bottom) + 6px);background:#000;border-top:1px solid rgba(255,255,255,.18);
+  }
+  #nav button{
+    flex:1;max-width:170px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:none;border:0;color:rgba(255,255,255,.55);font:inherit;font-size:12px;font-weight:700;
+    padding:4px 0;cursor:pointer;
+  }
+  #nav svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  #nav button[aria-selected=true]{color:var(--speed)}
+  #nav button:focus-visible{outline:3px solid #fff;outline-offset:-3px;border-radius:8px}
+  #app.sun #nav{background:#FFFBEB;border-top-color:rgba(0,0,0,.2)}
+  #app.sun #nav button{color:rgba(16,16,16,.55)}
+  #app.sun #nav button[aria-selected=true]{color:var(--speed)}
+  #app.inmenu .scr{display:none}
+
+  /* Onglet Menu : historique, réglages, aide */
+  #menu{
+    position:fixed;left:0;right:0;top:0;bottom:calc(env(safe-area-inset-bottom) + 66px);z-index:10;
+    box-sizing:border-box;overflow:auto;background:#000;color:var(--time);
+    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left));
+    font-size:min(4.2vw,2.6vh);line-height:1.3;
+  }
+  #app.sun #menu{background:#FFFBEB}
+  #menu .wrap{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:1.8vh}
+  #menu h2{margin:0;font-size:min(6vw,3.6vh);font-weight:800}
+  #menu h3{margin:0 0 .5em;font-size:1em;font-weight:800;letter-spacing:.02em}
+  #menu button{font:inherit;color:inherit;cursor:pointer}
+  #menu .big{display:flex;flex-direction:column;align-items:flex-start;gap:.25em;text-align:left;background:none;border:1.5px solid var(--ride);border-radius:12px;padding:1.4vh 3.5vw}
+  #menu .big b{color:var(--ride);font-size:1.08em}
+  #menu .big span{opacity:.9;font-size:.92em}
+  #menu .card2{border:1px solid rgba(128,128,128,.45);border-radius:12px;padding:1.2vh 3.5vw}
+  #menu .set{display:flex;align-items:center;justify-content:space-between;gap:.8em;padding:.55em 0;border-top:1px solid rgba(128,128,128,.25)}
+  #menu .set:first-of-type{border-top:0}
+  #menu .set small{opacity:.7}
+  #menu .set button{background:none;border:1.5px solid currentColor;border-radius:10px;padding:.3em .8em;opacity:.85;font-size:.92em}
+  #menu .set button[aria-pressed=true]{background:var(--speed);border-color:var(--speed);color:#000;opacity:1;font-weight:800}
+  #app.sun #menu .set button[aria-pressed=true]{color:#fff}
+  #menu .seg3{display:flex;gap:.35em}
+  #menu ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.6vh}
+  #menu li{display:flex;flex-direction:column;gap:.2em;font-size:.95em}
+  #menu li b{font-size:1.05em;letter-spacing:.02em}
+  #menu li span{opacity:.88}
+  #menu .c-speed{color:var(--speed)}
+  #menu .c-trip{color:var(--km)}
+  #menu .c-time{color:var(--cap)}
+
+  /* Historique : liste jour par jour, séance par séance */
+  #histo{font-size:inherit}
+  #histo .wrap{display:flex;flex-direction:column;gap:1.4vh}
+  #histo .top{display:flex;align-items:center;justify-content:space-between;gap:.6em}
+  #histo .pick{display:flex;gap:.4em}
+  #histo .pick button{flex:1;font-weight:700}
+  #histo .pick button[aria-pressed=true]{background:var(--speed);border-color:var(--speed);color:#000;opacity:1;font-weight:800}
+  #app.sun #histo .pick button[aria-pressed=true]{color:#fff}
+  #histo .total{font-weight:800;color:var(--km);font-size:1.02em}
+  #histo h2{margin:0;font-size:min(6vw,3.6vh);font-weight:800}
+  #histo button{font:inherit;font-size:.9em;color:inherit;background:none;border:1.5px solid currentColor;border-radius:10px;padding:.35em .8em;cursor:pointer;opacity:.85}
+  #histo .day{display:flex;justify-content:space-between;align-items:baseline;margin-top:1.6vh;padding-bottom:.3em;border-bottom:1px solid rgba(128,128,128,.5);font-weight:800;color:var(--km)}
+  #histo .day{flex-wrap:wrap}
+  #histo .day small{width:100%;margin-top:.15em;font-weight:600;opacity:.85;font-size:.85em}
+  #histo .s{display:grid;grid-template-columns:auto 1fr;gap:.1em 1em;padding:.5em 0;border-bottom:1px solid rgba(128,128,128,.2)}
+  #histo .s .h{font-weight:700;color:var(--cap)}
+  #histo .s .d{text-align:right;font-weight:700}
+  #histo .s .m{grid-column:1/-1;opacity:.75;font-size:.88em}
+  #histo .fill{margin-top:1vh;padding:.7em .9em;border:1.5px solid var(--fuel);border-radius:12px;display:flex;flex-direction:column;gap:.5em}
+  #histo .fill span{opacity:.9;font-size:.92em}
+  #histo .fill button{align-self:flex-start;color:var(--fuel);font-weight:700}
+  #histo .acts{display:flex;gap:.5em}
+  #histo .ck{display:none;width:1.05em;height:1.05em;margin-right:.55em;border:2px solid currentColor;border-radius:.25em;vertical-align:-.12em;box-sizing:border-box;position:relative}
+  #histo.sel .ck{display:inline-block}
+  #histo.sel .s{cursor:pointer}
+  #histo .s.off{opacity:.45;cursor:default}
+  #histo .s.on .ck{background:var(--km);border-color:var(--km)}
+  #histo .s.on .ck::after{content:"";position:absolute;left:.28em;top:.05em;width:.28em;height:.55em;border:solid #000;border-width:0 .17em .17em 0;transform:rotate(45deg)}
+  #app.sun #histo .s.on .ck::after{border-color:#fff}
+  #histo .s.on{background:rgba(128,128,128,.14)}
+  #histoBar{position:sticky;bottom:0;display:flex;gap:.6em;flex-wrap:wrap;padding:.8em 0;margin-top:1.2vh;background:#000;border-top:1px solid rgba(128,128,128,.5)}
+  #app.sun #histoBar{background:#FFFBEB}
+  #histoBar span{flex:1 0 100%;font-size:.88em;opacity:.8}
+  #histoBar button:disabled{opacity:.3;cursor:default}
+  #histoBar .danger{color:#FF6B6B;font-weight:700}
+  #app.sun #histoBar .danger{color:#B00020}
+  #histo .empty{opacity:.7;margin-top:3vh}
+  #histo .clr{align-self:flex-start;margin-top:2vh}
+
+  #time{height:min(12vw,7.5vh);color:var(--time)}
+  /* Cap sous l'heure : lettres + degrés, ou rien sans cap (la hauteur reste réservée), ou PAUSE */
+  #head{
+    display:flex;align-items:center;justify-content:center;min-height:1em;
+    font-size:min(11.5vw,7vh);font-weight:800;line-height:1;color:var(--cap);
+  }
+  #hval{display:flex;align-items:center;gap:.3em}
+  #hl{display:inline-block;width:1.9em;text-align:right}   /* 1 à 2 lettres : N, NE, SW... position stable */
+  #hd{height:.78em;color:var(--cap)}
+  #head.bike #hd{display:none}                                   /* à vélo : lettres seules, sans degrés */
+  #head.bike #hl{width:auto;text-align:center}
+
+  #status{
+    position:absolute;left:0;right:0;text-align:center;
+    top:calc(env(safe-area-inset-top) + 10px);
+    font-size:min(4vw,2.4vh);color:var(--dim);
+  }
+</style>
+</head>
+<body>
+  <div id="status" role="status">Recherche du GPS…</div>
+
+  <main id="app">
+    <div id="topBlock" class="scr">
+      <svg id="dial" viewBox="0 0 400 400" role="img" aria-label="Compas" aria-hidden="false"></svg>
+      <svg id="dialHd" class="seg" role="img" aria-label="Cap en degrés"></svg>
+      <section class="row panel scr" id="rowSpeed">
+        <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
+        <span id="u1" class="side" aria-label="Unité">km/h</span>
+      </section>
+    </div>
+    <svg id="timeB" class="seg scr" role="img" aria-label="Heure"></svg>
+
+    <div class="trip panel scr" id="trip">
+      <section class="row">
+        <svg id="km" class="num seg" role="img" aria-label="Distance"></svg>
+        <span id="u2" class="side"><small>trip</small><span id="u2u">m</span></span>
+      </section>
+
+      <section class="row">
+        <svg id="ride" class="num seg" role="img" aria-label="Temps de roulage"></svg>
+      </section>
+
+      <section class="row" id="rowFuel" hidden>
+        <svg id="fuel" class="num seg" role="img" aria-label="Litres consommés (estimation)"></svg>
+        <span id="u3" class="side"><small>conso</small><span>litres</span></span>
+      </section>
+
+      <div id="confirm" hidden>
+        <p>remettre à zéro ?</p>
+        <div class="btns">
+          <button id="yes" type="button">Oui</button>
+          <button id="no" type="button">Non</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="clock panel scr" id="clock">
+      <section class="row">
+        <svg id="time" class="num seg" role="img" aria-label="Heure"></svg>
+      </section>
+
+      <section class="row">
+        <span id="head" class="num" role="img" aria-label="Cap">
+          <span id="hmsg"></span>
+          <span id="hval" hidden><span id="hl"></span><svg id="hd" class="seg" aria-hidden="true"></svg></span>
+        </span>
+      </section>
+    </div>
+    <div id="ctl" class="scr">
+      <button id="bPlay" type="button" aria-label="Pause ou reprise"><svg class="ii" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg><svg class="ip" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 L20 12 L7 20 Z"/></svg></button>
+      <button id="bStop" type="button" aria-label="Terminer la séance"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></button>
+      <button id="bReset" type="button" aria-label="Remise à zéro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 a8 8 0 1 1 -7.6 5.6 M12 1 L12 7 L7 4 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="bPos" type="button" aria-label="Afficher ma position"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg></button>
+      <button id="bSun" type="button" aria-label="Mode plein soleil" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.6"/><g stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 2.2V5M12 19V21.8M2.2 12H5M19 12H21.8M5.1 5.1L7.1 7.1M16.9 16.9L18.9 18.9M5.1 18.9L7.1 16.9M16.9 7.1L18.9 5.1"/></g></svg></button>
+    </div>
+    <div id="toast" role="status" hidden></div>
+    <div id="pos" hidden role="dialog" aria-label="Position actuelle">
+      <div class="pl">Latitude</div><div class="pv" id="pLat">--</div>
+      <div class="pl pg">Longitude</div><div class="pv" id="pLon">--</div>
+      <div class="pd" id="pDec"></div>
+      <div class="pr" id="pRte"></div>
+      <div class="pt"><div><small>Heure locale</small><span id="pLoc">--:--</span></div><div><small>Heure UTC</small><span id="pUtc">--:--</span></div></div>
+      <div class="pa" id="pAge"></div>
+      <div class="ph">Touche l'écran pour revenir</div>
+    </div>
+
+    <div id="menu" hidden>
+      <div id="menuHome" class="wrap">
+        <h2>Menu</h2>
+        <button id="histoBtn" class="big" type="button"><b>Historique ›</b><span>Vos séances, jour par jour.</span></button>
+
+        <section class="card2">
+          <h3>Réglages</h3>
+          <div class="set"><span>Mode plein soleil</span><button id="setSun" type="button"></button></div>
+          <div class="set"><span>Vitesse vélo</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
+          <div class="set"><span>Vitesse bateau</span><div class="seg3" data-act="boat"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
+          <div class="set"><span>Calibrage conso <small id="calVal"></small></span><button id="setCal" type="button">Régler</button></div>
+        </section>
+
+        <section class="card2">
+          <h3>Aide</h3>
+          <ul>
+            <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte. Bateau : compas à rose tournante ; le cap vient du GPS (route sur le fond), il se fige à l'arrêt.</span></li>
+            <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps, litres et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
+            <li><b class="c-trip">Litres (bateau)</b><span>Consommation estimée. Appui long : calibrage (ou dans Réglages).</span></li>
+            <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
+          </ul>
+        </section>
+      </div>
+
+      <div id="histo" hidden>
+        <div class="wrap">
+          <div class="top"><button id="histoBack" type="button">‹ Retour</button><h2>Historique</h2><button id="histoSel" type="button">Sélectionner</button></div>
+          <div class="pick" id="histoPick"><button type="button" data-a="bike">Vélo</button><button type="button" data-a="boat">Bateau</button></div>
+          <div id="histoTotal" class="total"></div>
+          <div id="histoFill"></div>
+          <div id="histoList"></div>
+          <div id="histoBar" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <nav id="nav" role="tablist" aria-label="Onglets">
+      <button id="tabBike" type="button" role="tab" aria-selected="true"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="21" r="5.5"/><circle cx="24" cy="21" r="5.5"/><path d="M8 21 L13 11 H20 L24 21 M13 11 L17.5 21 H8 M12 8 H15 M20 11 L18.5 7.5 H22"/></svg><span>Vélo</span></button>
+      <button id="tabBoat" type="button" role="tab" aria-selected="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 22 H28 L24 27 H8 Z M16 4 V22 M16 6 L26 19 H16 M14 10 L7 19 H14"/></svg><span>Bateau</span></button>
+      <button id="tabMenu" type="button" role="tab" aria-selected="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 9 H27 M5 16 H27 M5 23 H27"/></svg><span>Menu</span></button>
+    </nav>
+  </main>
+
+<script>
+(function(){
+  'use strict';
+
+  var MAX_ACC = 30;    // m : fixes moins précis que ça sont ignorés
+  var MIN_KMH = 2;     // km/h : en dessous, on considère l'arrêt (pas de cumul, cap masqué)
+  var RESUME_KMH = 12; // km/h : en pause, rouler au-dessus de cette vitesse...
+  var RESUME_MS = 5000;//   ...pendant 5 s relance le comptage tout seul (mode km/h seulement)
+  var KEY_P = 'compteur-velo-pause';  // pause en cours : '1' ou '0'
+  var KEY_S = 'compteur-velo-soleil'; // mode soleil : '1' ou '0'
+  var KEY_PR = 'compteur-velo-precision'; // 'd1' | 'd2' | 'plus' | 'int'
+  var KEY_H = 'compteur-velo-histo';  // historique : liste des séances terminées
+  var KEY_C = 'compteur-velo-seance'; // séance en cours
+  var SESS_GAP_MS = 60 * 60 * 1000;   // 1 h sans rouler : la séance est terminée
+  var SESS_MIN_M = 100;               // une séance de moins de 100 m n'est pas enregistrée
+  var HIST_MAX = 2000;                // nombre maximum de séances conservées
+  var KEY_M = 'compteur-velo-m';    // distance en mètres
+  var KEY_L = 'compteur-velo-litres';   // litres estimés depuis le reset (mode knots)
+  var KEY_F = 'compteur-velo-plein';   // date (ms) du dernier « plein fait »
+  var KEY_K = 'compteur-velo-calib';    // coefficient de calibrage de la conso
+  var KEY_T = 'compteur-velo-ms';   // temps de roulage en millisecondes
+  var KEY_U = 'compteur-velo-unit'; // ancienne unité choisie (sert à la migration)
+  var KEY_ST = 'compteur-velo-compteurs';  // compteurs séparés : { bike:{m,t}, boat:{m,t,l} }
+  var KEY_TAB = 'compteur-velo-onglet';    // dernière activité affichée : 'bike' ou 'boat'
+  var KEY_PM = 'compteur-velo-precisions'; // précision de la vitesse par activité
+  var KEY_RS = 'compteur-velo-etat';       // état du comptage : 'idle' (arrêté), 'run' (en marche), 'pause'
+
+  var $ = function(id){ return document.getElementById(id); };
+  var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elFuel = $('fuel'), elRowFuel = $('rowFuel'), elTime = $('time'), elTimeB = $('timeB'), elDial = $('dial'), elDialHd = $('dialHd'),
+      elHead = $('head'), elStatus = $('status'),
+      elU1 = $('u1'), elU2u = $('u2u'),
+      elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no'),
+      elApp = $('app'), elRowSpeed = $('rowSpeed'), elClock = $('clock'),
+      elMenu = $('menu'), elMenuHome = $('menuHome'),
+      elHmsg = $('hmsg'), elHval = $('hval'), elHl = $('hl'), elHd = $('hd');
+
+  /* ---------- Affichage à segments (7 segments) ---------- */
+  var S = 5, D = 1.5, W = 56, H = 100, ADV = 66, GAP = ADV - W, SKEW = 14;
+  function hseg(cy, x1, x2){
+    return [[x1+D,cy],[x1+D+S,cy-S],[x2-D-S,cy-S],[x2-D,cy],[x2-D-S,cy+S],[x1+D+S,cy+S]];
+  }
+  function vseg(cx, y1, y2){
+    return [[cx,y1+D],[cx+S,y1+D+S],[cx+S,y2-D-S],[cx,y2-D],[cx-S,y2-D-S],[cx-S,y1+D+S]];
+  }
+  var SHAPES = {
+    a: hseg(S, S, W-S), g: hseg(H/2, S, W-S), d: hseg(H-S, S, W-S),
+    f: vseg(S, S, H/2), b: vseg(W-S, S, H/2), e: vseg(S, H/2, H-S), c: vseg(W-S, H/2, H-S)
+  };
+  var ORDER = 'abcdefg';
+  var LIT = { '0':'abcdef','1':'bc','2':'abdeg','3':'abcdg','4':'bcfg','5':'acdfg',
+              '6':'acdefg','7':'abc','8':'abcdefg','9':'abcdfg','-':'g',' ':'' };
+
+  function pts(poly, ox){
+    return poly.map(function(p){ return (p[0] + ox) + ',' + p[1]; }).join(' ');
+  }
+  // small = true : les chiffres après le point sont dessinés à moitié de leur taille, alignés sur le bas
+  function build(text, small){
+    var x = 0, out = [], lastDigit = false, afterDot = false, lastSmall = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text.charAt(i);
+      if (ch === ':') {
+        out.push('<rect x="' + (x+5) + '" y="25" width="10" height="10"/>' +
+                 '<rect x="' + (x+5) + '" y="65" width="10" height="10"/>');
+        x += 20; lastDigit = false;
+      } else if (ch === '°') {
+        out.push('<circle cx="' + (x+12) + '" cy="13" r="9" fill="none" stroke="currentColor" stroke-width="5"/>');
+        x += 28; lastDigit = false;
+      } else if (ch === '.') {
+        out.push('<rect x="' + (x+4) + '" y="90" width="10" height="10"/>');
+        x += 18; lastDigit = false; afterDot = true;
+      } else if ((ch === '+' || ch === '_') && small) {
+        out.push('<g transform="translate(' + x + ',' + (H / 2) + ') scale(.5)" class="' + (ch === '+' ? 'on' : 'off') + '">' +
+                 '<rect x="6" y="45" width="44" height="10"/><rect x="23" y="22" width="10" height="56"/></g>');
+        x += ADV / 2; lastDigit = true; lastSmall = true;
+      } else {
+        var on = LIT[ch] || '';
+        var half = small && afterDot;
+        if (half) out.push('<g transform="translate(' + x + ',' + (H / 2) + ') scale(.5)">');
+        for (var k = 0; k < ORDER.length; k++) {
+          var s = ORDER.charAt(k);
+          out.push('<polygon class="' + (on.indexOf(s) >= 0 ? 'on' : 'off') +
+                   '" points="' + pts(SHAPES[s], half ? 0 : x) + '"/>');
+        }
+        if (half) out.push('</g>');
+        x += half ? ADV / 2 : ADV; lastDigit = true; lastSmall = half;
+      }
+    }
+    if (lastDigit) x -= lastSmall ? GAP / 2 : GAP;
+    return { w: x + SKEW,
+             html: '<g transform="translate(' + SKEW + ',0) skewX(-8)">' + out.join('') + '</g>' };
+  }
+  function setSeg(el, text, small){
+    if (el._t === text) return;
+    el._t = text;
+    var r = build(text, small);
+    el.setAttribute('viewBox', '0 0 ' + r.w + ' ' + H);
+    el.style.aspectRatio = r.w + ' / ' + H;
+    el.innerHTML = r.html;
+    el.setAttribute('aria-label', text.replace(/^\s+/, ''));
+  }
+
+  /* ---------- Formats ---------- */
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  // Précision de la vitesse (appui long sur la vitesse) : 'd1' = 0,1 · 'd2' = décimales paires · 'int' = entier seul · 'plus' = entier, « + » dès x,5
+  // d2 et plus tronquent (jamais au-dessus de la vitesse réelle).
+  function fmtSpeed(v){
+    if (speedMode === 'int')  return String(Math.floor(v + 1e-9));
+    if (speedMode === 'plus') { var n = Math.floor(v * 2 + 1e-9); return Math.floor(n / 2) + (n % 2 ? '+' : '_'); }
+    if (speedMode === 'd2')   { var q = Math.floor(v * 10 + 1e-9); q -= q % 2; return Math.floor(q / 10) + '.' + (q % 10); }
+    return v.toFixed(1);
+  }
+  // Trip : en mètres (entiers) en mode km/h, en milles nautiques (1 mille = 1 852 m) en mode nœuds
+  function fmtKm(m){ return unit === 'nm' ? (m / 1852).toFixed(2) : (Math.round(m / 10) * 10 / 1000).toFixed(3); }   // vélo : km à 3 décimales, arrondi à 10 m
+  function fmtRide(ms){
+    var s = Math.floor(ms / 1000);
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h + ':' + pad2(m) + ':' + pad2(s % 60);
+  }
+
+  /* ---------- Trip : distance et temps de roulage (mémorisés) ---------- */
+  var act = 'bike';                 // activité comptée : 'bike' (vélo) ou 'boat' (bateau) ; seul l'onglet affiché compte
+  var tab = 'bike';                 // onglet affiché : 'bike', 'boat' ou 'menu' (pendant le menu, la dernière activité continue de compter)
+  var unit = 'km';                  // dérivé de act : 'km' (km/h, mètres) ou 'nm' (nœuds, milles)
+  var store = { bike: { m: 0, t: 0 }, boat: { m: 0, t: 0, l: 0 } };   // compteurs séparés
+  var modes = { bike: 'd2', boat: 'd1' }, runState = 'idle';   // le comptage ne démarre que par le bouton ▶
+  var odo = 0, rideMs = 0, fuel = 0;                                    // copie des compteurs de l'activité affichée
+  var lastKmh = 0, paused = false, fastSince = 0, sun = false, speedMode = 'd2',
+      hist = [], sess = null, fuelCal = 1, lastFill = 0;
+  function num(k){ var v = parseFloat(localStorage.getItem(k)); return isFinite(v) && v >= 0 ? v : 0; }
+  try {
+    var legacyAct = localStorage.getItem(KEY_U) === 'nm' ? 'boat' : 'bike';
+    var ss = JSON.parse(localStorage.getItem(KEY_ST) || 'null');
+    if (ss && ss.bike && ss.boat) {
+      store = ss;
+    } else {   // migration : l'ancien compteur unique revient à l'activité qui était affichée
+      store[legacyAct].m = num(KEY_M); store[legacyAct].t = num(KEY_T);
+      if (legacyAct === 'boat') store.boat.l = num(KEY_L);
+    }
+    store.bike.m = +store.bike.m || 0; store.bike.t = +store.bike.t || 0;
+    store.boat.m = +store.boat.m || 0; store.boat.t = +store.boat.t || 0; store.boat.l = +store.boat.l || 0;
+    var tb = localStorage.getItem(KEY_TAB);
+    act = (tb === 'boat' || tb === 'bike') ? tb : legacyAct;
+    var okm = function(v){ return v === 'd1' || v === 'd2' || v === 'plus' || v === 'int'; };
+    var pm = JSON.parse(localStorage.getItem(KEY_PM) || 'null');
+    if (pm && okm(pm.bike) && okm(pm.boat)) modes = pm;
+    else { var oldm = localStorage.getItem(KEY_PR); if (okm(oldm)) modes.boat = oldm; }   // le bateau garde l'ancien réglage, le vélo passe à 0,2
+    var rs = localStorage.getItem(KEY_RS);
+    if (rs === 'run' || rs === 'pause') runState = rs;
+    if (localStorage.getItem(KEY_S) === '1') sun = true;
+    var sf = parseFloat(localStorage.getItem(KEY_F));
+    if (isFinite(sf) && sf > 0) lastFill = sf;
+    var sk = parseFloat(localStorage.getItem(KEY_K));
+    if (isFinite(sk) && sk > 0.3 && sk < 3) fuelCal = sk;
+    var sh = JSON.parse(localStorage.getItem(KEY_H) || '[]');
+    if (Array.isArray(sh)) hist = sh.filter(function(x){ return x && typeof x.s === 'number' && typeof x.d === 'number'; });
+    var sc = JSON.parse(localStorage.getItem(KEY_C) || 'null');
+    if (sc && typeof sc.s === 'number' && typeof sc.e === 'number') sess = sc;
+  } catch(e){}
+  tab = act;
+  unit = act === 'boat' ? 'nm' : 'km';
+  odo = store[act].m; rideMs = store[act].t; fuel = store.boat.l || 0;
+  paused = runState !== 'run'; speedMode = modes[act];   // paused = « on ne compte pas » (arrêt ou pause)
+  function saveState(){
+    store[act].m = odo; store[act].t = rideMs;
+    if (act === 'boat') store.boat.l = fuel;
+    try { localStorage.setItem(KEY_ST, JSON.stringify(store)); } catch(e){}
+  }
+  /* ---------- Séances : enregistrées automatiquement, indépendamment du trip ----------
+     Une séance démarre au premier mouvement. Elle se termine après 1 h sans rouler,
+     ou quand le trip est remis à zéro. Elle ne compte ni la pause ni l'arrêt. */
+  function saveSess(){ try { localStorage.setItem(KEY_C, JSON.stringify(sess)); } catch(e){} }
+  function saveHist(){ try { localStorage.setItem(KEY_H, JSON.stringify(hist)); } catch(e){} }
+  function sessAdd(dm, dms, ts, kmh, l){
+    if (!sess) sess = { s: ts, e: ts, d: 0, t: 0, v: 0, u: unit };   // u : unité utilisée au départ
+    sess.e = ts; sess.d += dm; sess.t += dms;
+    if (l) sess.l = (sess.l || 0) + l;
+    if (kmh > sess.v && kmh < 90) sess.v = kmh;                    // vitesse max, hors pics GPS aberrants
+    saveSess();
+  }
+  function closeSess(){
+    if (sess && sess.d >= SESS_MIN_M) {
+      hist.push(sess);
+      if (hist.length > HIST_MAX) hist.shift();
+      saveHist();
+    }
+    sess = null;
+    saveSess();
+  }
+  /* ---------- Consommation estimée (mode knots) ----------
+     Table vitesse (nœuds) -> litres/heure, interpolée linéairement, multipliée par le coefficient de calibrage.
+     Valeurs de départ pour un 115 ch 2 temps : à ajuster avec les pleins (appui long sur les litres). */
+  var FUEL_PTS = [[1,3.5],[3,6],[8,12],[13,18],[18,21],[25,30],[30,40],[35,45]];
+  function fuelRate(kn){
+    var P = FUEL_PTS, n = P.length;
+    if (kn <= P[0][0]) return P[0][1];
+    if (kn >= P[n-1][0]) return P[n-1][1];
+    for (var i = 1; i < n; i++) {
+      if (kn <= P[i][0]) {
+        var a = P[i-1], b = P[i];
+        return a[1] + (b[1] - a[1]) * (kn - a[0]) / (b[0] - a[0]);
+      }
+    }
+    return P[n-1][1];
+  }
+  function fmtFuel(l){ return (l < 100 ? l.toFixed(1) : String(Math.round(l))); }
+  function showFuel(){
+    elRowFuel.hidden = act !== 'boat';
+    if (act === 'boat') setSeg(elFuel, fmtFuel(fuel));
+  }
+  function showKm(){ setSeg(elKm, fmtKm(odo)); }
+  function fmtRideBoat(ms){ var m = Math.floor(ms / 60000); return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); }   // bateau : hh:mm
+  function showRide(){ setSeg(elRide, act === 'boat' ? fmtRideBoat(rideMs) : fmtRide(rideMs)); }
+  // Vitesse : mesurée en km/h en interne, convertie en nœuds à l'affichage (1 kn = 1,852 km/h)
+  function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh), true); }
+  function applyUnit(){
+    unit = act === 'boat' ? 'nm' : 'km';
+    elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
+    elU2u.textContent = unit === 'nm' ? 'miles' : 'km';
+    elApp.classList.toggle('boat', act === 'boat');
+    elHead.classList.toggle('bike', act === 'bike');   // à vélo : lettres du cap seules, sans degrés
+    showFuel();
+    showSpeed();
+    showKm();
+    showRide();
+    if (typeof placeCtl === 'function') placeCtl();
+  }
+  showRide();
+  applyUnit();
+  if (sess && (sess.u === 'nm') !== (act === 'boat')) closeSess();   // séance restée ouverte d'une autre activité
+
+  /* ---------- Remise à zéro : appui sur le trip, puis confirmation ---------- */
+  var confirmTimer = null;
+  function openConfirm(){
+    elConfirm.hidden = false;
+    clearTimeout(confirmTimer);
+    confirmTimer = setTimeout(closeConfirm, 6000);   // sans réponse, la question disparaît
+  }
+  function closeConfirm(){
+    clearTimeout(confirmTimer);
+    elConfirm.hidden = true;
+  }
+  /* Appui long sur les litres : calibrage (coefficient appliqué à toute la table) */
+  var fuelTimer = 0, fuelLong = false, fuelSwallow = false;
+  function askCal(){
+    var cur = String(Math.round(fuelCal * 100) / 100).replace('.', ',');
+    var r = window.prompt('Calibrage de la conso (1 = table d\'origine).\nExemple : l\'appli compte 5 L pour 4,2 L réels → 0,84.\nCoefficient :', cur);
+    if (r === null) return;
+    var k = parseFloat(String(r).replace(',', '.'));
+    if (isFinite(k) && k > 0.3 && k < 3) {
+      fuelCal = k;
+      try { localStorage.setItem(KEY_K, String(k)); } catch(e){}
+      toast('Calibrage : ×' + String(Math.round(k * 100) / 100).replace('.', ','));
+    }
+  }
+  elRowFuel.addEventListener('pointerdown', function(){
+    fuelLong = false; clearTimeout(fuelTimer);
+    fuelTimer = setTimeout(function(){ fuelLong = true; if (navigator.vibrate) { try { navigator.vibrate(30); } catch(e){} } }, 650);
+  });
+  elRowFuel.addEventListener('pointerup', function(){
+    clearTimeout(fuelTimer);
+    if (fuelLong) {
+      fuelLong = false; fuelSwallow = true;
+      setTimeout(function(){ fuelSwallow = false; }, 600);
+      setTimeout(askCal, 80);
+    }
+  });
+  ['pointercancel','pointerleave'].forEach(function(n){ elRowFuel.addEventListener(n, function(){ clearTimeout(fuelTimer); fuelLong = false; }); });
+  elRowFuel.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  elYes.addEventListener('click', function(){
+    odo = 0; rideMs = 0; fuel = 0; saveState(); showKm(); showRide(); showFuel(); closeConfirm();
+    closeSess();   // la remise à zéro termine la séance en cours
+  });
+  elNo.addEventListener('click', closeConfirm);
+
+  /* ---------- État du comptage : arrêté (idle) · en marche (run) · pause ----------
+     Rien n'est compté (trip, temps, litres, séance) tant qu'on n'a pas appuyé sur ▶. */
+  function setRun(st){
+    runState = st; paused = st !== 'run'; fastSince = 0;
+    elApp.classList.toggle('paused', st === 'pause');
+    elApp.classList.toggle('idle', st === 'idle');
+    try { localStorage.setItem(KEY_RS, st); } catch(e){}
+    setHead(lastHead, lastDeg);
+  }
+  var elToast = $('toast'), toastT = 0;
+  function toast(t){
+    elToast.textContent = t; elToast.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(function(){ elToast.hidden = true; }, 1800);
+  }
+  elRowSpeed.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  $('bPlay').addEventListener('click', function(){
+    if (runState === 'run') { setRun('pause'); return; }
+    var fresh = runState === 'idle';
+    setRun('run');
+    if (fresh) toast('Comptage démarré');
+  });
+  $('bReset').addEventListener('click', openConfirm);
+  $('bStop').addEventListener('click', function(){
+    if (!sess) { setRun('idle'); toast('Aucune séance en cours'); return; }
+    var ok = sess.d >= SESS_MIN_M;
+    closeSess(); setRun('idle');
+    toast(ok ? 'Séance terminée et enregistrée' : 'Séance trop courte : non enregistrée');
+  });
+  /* Les boutons flottent juste au-dessus de la barre d'onglets */
+  var elCtl = $('ctl');
+  function placeCtl(){
+    if (!elCtl || elApp.classList.contains('inmenu')) return;
+    var n = $('nav').getBoundingClientRect();
+    if (!n.height) return;
+    elCtl.style.top = Math.round(n.top - elCtl.offsetHeight - Math.max(8, window.innerHeight * 0.008)) + 'px';
+    // Vélo : si l'écran est court, on libère juste ce qu'il faut pour que l'heure (et son cadran en mode soleil) ne touche pas les boutons
+    elApp.style.paddingBottom = '';
+    if (act === 'bike') {
+      var extra = 0, btnTop = elCtl.getBoundingClientRect().top;
+      for (var i = 0; i < 3; i++) {
+        var c = elClock.getBoundingClientRect();
+        var need = c.bottom + (sun ? window.innerHeight * 0.0045 : 0) + 6 - btnTop;
+        if (need <= 0) break;
+        extra += Math.ceil(need * 4 / 3);
+        elApp.style.paddingBottom = 'calc(3.2vh + ' + extra + 'px)';
+      }
+    }
+  }
+  window.addEventListener('resize', placeCtl);
+  /* Les boutons s'estompent au bout de 4 s sans toucher (seulement pendant que ça compte) et se rallument au moindre contact */
+  var ctlTimer = 0;
+  function wakeCtl(){
+    elCtl.classList.add('on');
+    clearTimeout(ctlTimer);
+    ctlTimer = setTimeout(function(){ elCtl.classList.remove('on'); }, 4000);
+  }
+  document.addEventListener('pointerdown', wakeCtl, true);
+  wakeCtl();
+  elApp.classList.toggle('paused', runState === 'pause'); elApp.classList.toggle('idle', runState === 'idle');
+
+  /* ---------- Mode soleil : appui sur l'heure ---------- */
+  function setSun(v){
+    sun = v;
+    if (v) elApp.classList.add('sun'); else elApp.classList.remove('sun');
+    $('bSun').setAttribute('aria-pressed', v ? 'true' : 'false');
+    if (typeof placeCtl === 'function') placeCtl();
+    try { localStorage.setItem(KEY_S, v ? '1' : '0'); } catch(e){}
+  }
+  elClock.addEventListener('click', function(){ setSun(!sun); });
+  $('bSun').addEventListener('click', function(){ setSun(!sun); });
+  if (sun) { elApp.classList.add('sun'); $('bSun').setAttribute('aria-pressed', 'true'); }
+
+  var elHisto = $('histo'), elHistoList = $('histoList');
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && !elHisto.hidden) closeHisto();
+  });
+
+  /* ---------- Historique ---------- */
+  function p2(n){ return n < 10 ? '0' + n : '' + n; }
+  function dayKey(ts){ var d = new Date(ts); return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate()); }
+  function dayLabel(ts){
+    var s = new Date(ts).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function hm(ts){ var d = new Date(ts); return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
+  function dur(ms){
+    return fmtRide(Math.round(ms / 1000) * 1000);   // h:mm:ss, comme le temps de roulage de l'écran principal
+  }
+  function dist(m, u){
+    if ((u || unit) === 'nm') return (m / 1852).toFixed(2).replace('.', ',') + ' miles';
+    return m >= 1000 ? (Math.round(m / 10) * 10 / 1000).toFixed(3).replace('.', ',') + ' km' : Math.round(m) + ' m';   // km à 3 décimales, arrondi à 10 m
+  }
+  function spd(kmh, u){
+    return (u || unit) === 'nm' ? (kmh / 1.852).toFixed(1).replace('.', ',') + ' knots' : kmh.toFixed(1).replace('.', ',') + ' km/h';
+  }
+  function fl(l){ return l.toFixed(1).replace('.', ',') + ' L'; }
+  function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+  /* Calibrage par « Plein fait » : compare les litres estimés depuis le dernier plein aux litres réellement remis.
+     L'écart n'est appliqué qu'à moitié, pour qu'un plein approximatif ne fausse pas le coefficient. */
+  function fuelSince(){
+    var t = 0;
+    hist.forEach(function(x){ if (x.s >= lastFill) t += x.l || 0; });
+    if (sess && sess.s >= lastFill) t += sess.l || 0;
+    return t;
+  }
+  var histAct = 'bike';   // activité affichée dans l'historique (sélecteur Vélo | Bateau)
+  function hhmm(ms){ var m = Math.floor(ms / 60000); return Math.floor(m / 60) + ' h ' + p2(m % 60); }
+  function renderFill(){
+    var el = $('histoFill'), h = '<div class="fill">';
+    if (histAct !== 'boat') { el.innerHTML = ''; return; }   // réglage visible seulement pour le bateau
+    if (!lastFill) {
+      h += '<span>Calibrage de la conso : après un plein, touchez « Plein fait » pour poser le point de départ.</span>';
+    } else {
+      h += '<span>Depuis le plein du ' + esc(new Date(lastFill).toLocaleDateString('fr-FR', { day:'numeric', month:'long' })) +
+           ' : ' + esc(fl(fuelSince())) + ' estimés (coefficient ×' + esc(String(Math.round(fuelCal * 100) / 100).replace('.', ',')) + ')</span>';
+    }
+    h += '<button id="fillBtn" type="button">Plein fait</button></div>';
+    el.innerHTML = h;
+    $('fillBtn').addEventListener('click', onFill);
+  }
+  function onFill(){
+    if (!lastFill) {
+      if (!window.confirm('Enregistrer ce plein comme point de départ ?\nLe calibrage se calculera au prochain plein.')) return;
+      lastFill = Date.now();
+      try { localStorage.setItem(KEY_F, String(lastFill)); } catch(e){}
+      renderFill(); return;
+    }
+    var counted = fuelSince();
+    if (counted < 3) {
+      window.alert('Seulement ' + fl(counted) + ' comptés depuis le dernier plein : trop peu pour calibrer.\nFaites d\'abord une sortie en knots.');
+      return;
+    }
+    var r = window.prompt('Litres réellement remis au plein (l\'appli en a compté ' + fl(counted).replace(' L','') + ') :', '');
+    if (r === null) return;
+    var real = parseFloat(String(r).replace(',', '.'));
+    if (!isFinite(real) || real <= 0) { window.alert('Valeur non valide.'); return; }
+    var ratio = real / counted;
+    if (ratio < 0.4 || ratio > 2.5) {
+      window.alert('Écart trop grand (' + fl(counted) + ' comptés, ' + fl(real) + ' remis) : il y a sûrement une erreur de saisie ou un plein manqué. Rien n\'est modifié.');
+      return;
+    }
+    var next = Math.min(2, Math.max(0.5, fuelCal * (1 + (ratio - 1) / 2)));   // moitié de l'écart seulement
+    var f2 = function(v){ return String(Math.round(v * 100) / 100).replace('.', ','); };
+    if (!window.confirm(fl(counted) + ' comptés, ' + fl(real) + ' réels.\nCoefficient : ×' + f2(fuelCal) + ' → ×' + f2(next) + ' (correction à moitié).\nAppliquer ?')) return;
+    fuelCal = next;
+    lastFill = Date.now();
+    try { localStorage.setItem(KEY_K, String(fuelCal)); localStorage.setItem(KEY_F, String(lastFill)); } catch(e){}
+    toast('Calibrage : ×' + f2(fuelCal));
+    renderFill();
+  }
+  /* Sélection : bouton « Sélectionner » -> cases à cocher, puis Supprimer / Fusionner (même type seulement) */
+  var selMode = false, picked = [], rows = [];
+  function isBoat(x){ return x.u === 'nm'; }
+  function setSelMode(v){
+    selMode = v; picked = [];
+    elHisto.classList.toggle('sel', v);
+    $('histoSel').textContent = v ? 'Terminer' : 'Sélectionner';
+    renderHisto();
+  }
+  function renderBar(){
+    var bar = $('histoBar');
+    if (!selMode) { bar.hidden = true; return; }
+    bar.hidden = false;
+    var n = picked.length, boats = picked.filter(isBoat).length;
+    var mixed = boats > 0 && boats < n;
+    var note = n ? n + ' séance' + (n > 1 ? 's' : '') + ' sélectionnée' + (n > 1 ? 's' : '') +
+                   (mixed ? ' — vélo et bateau ne peuvent pas être fusionnés' : '')
+                 : 'Touchez les séances à sélectionner';
+    bar.innerHTML = '<span>' + esc(note) + '</span>' +
+      '<button id="barAll" type="button">Tout</button>' +
+      '<button id="barMerge" type="button"' + (n < 2 || mixed ? ' disabled' : '') + '>Fusionner</button>' +
+      '<button id="barDel" class="danger" type="button"' + (n < 1 ? ' disabled' : '') + '>Supprimer</button>';
+    $('barAll').addEventListener('click', function(){
+      var sel = rows.filter(function(x){ return x !== sess; });
+      picked = picked.length === sel.length ? [] : sel.slice();
+      renderHisto();
+    });
+    $('barMerge').addEventListener('click', doMerge);
+    $('barDel').addEventListener('click', doDelete);
+  }
+  function affectsFuel(list){   // sorties bateau avec litres comptés dans le calibrage en cours
+    return !!lastFill && list.some(function(x){ return isBoat(x) && (x.l || 0) > 0 && x.s >= lastFill; });
+  }
+  function doDelete(){
+    var n = picked.length; if (!n) return;
+    var msg = 'Supprimer ' + n + ' séance' + (n > 1 ? 's' : '') + ' ? C\'est définitif.';
+    if (affectsFuel(picked)) msg += '\n\nAttention : les litres de sorties bateau supprimées ne compteront plus pour le calibrage du prochain plein.';
+    if (!window.confirm(msg)) return;
+    hist = hist.filter(function(x){ return picked.indexOf(x) < 0; });
+    saveHist(); setSelMode(false);
+  }
+  function doMerge(){
+    var n = picked.length; if (n < 2) return;
+    var boat = isBoat(picked[0]);
+    if (picked.some(function(x){ return isBoat(x) !== boat; })) return;
+    var m = { s: Infinity, e: 0, d: 0, t: 0, v: 0, u: boat ? 'nm' : 'km' }, l = 0;
+    picked.forEach(function(x){
+      if (x.s < m.s) m.s = x.s;
+      if (x.e > m.e) m.e = x.e;
+      m.d += x.d; m.t += x.t; if (x.v > m.v) m.v = x.v; l += x.l || 0;
+    });
+    if (l > 0) m.l = l;
+    var msg = 'Fusionner ' + n + ' séances en une seule ?\nDe ' + hm(m.s) + ' à ' + hm(m.e) + ' : ' + dist(m.d, m.u) + ', durée ' + dur(m.t) + '.\nLes séances d\'origine sont remplacées.';
+    var firstStart = lastFill && picked.some(function(x){ return x.s < lastFill; }) && picked.some(function(x){ return x.s >= lastFill; });
+    if (boat && l > 0 && firstStart) msg += '\n\nAttention : cette fusion enjambe le dernier plein ; tous ses litres seront comptés depuis le prochain plein.';
+    if (!window.confirm(msg)) return;
+    hist = hist.filter(function(x){ return picked.indexOf(x) < 0; });
+    hist.push(m);
+    hist.sort(function(a, b){ return a.s - b.s; });
+    saveHist(); setSelMode(false);
+  }
+  function renderHisto(){
+    var boat = histAct === 'boat';
+    function mine(x){ return isBoat(x) === boat; }
+    renderFill();
+    Array.prototype.forEach.call($('histoPick').children, function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-a') === histAct ? 'true' : 'false'); });
+    var all = hist.filter(mine);
+    var hasHist = all.length > 0;
+    if (sess && mine(sess) && sess.d >= SESS_MIN_M) all.push(sess);
+    rows = all;
+    picked = picked.filter(function(x){ return all.indexOf(x) >= 0; });
+    $('histoSel').hidden = !hasHist;
+    var td = 0, tt = 0, tl = 0;
+    all.forEach(function(x){ td += x.d; tt += x.t; tl += x.l || 0; });
+    $('histoTotal').textContent = all.length
+      ? 'Total : ' + (boat ? (td / 1852).toFixed(1).replace('.', ',') + ' miles' : (Math.round(td / 10) * 10 / 1000).toFixed(3).replace('.', ',') + ' km')   /* 3 décimales, arrondi à 10 m : la dernière est toujours 0 */ +
+        ' · ' + hhmm(tt) + (boat && tl > 0 ? ' · ' + fl(tl) : '')
+      : '';
+    if (!all.length) { elHistoList.innerHTML = '<p class="empty">Aucune sortie ' + (boat ? 'en bateau' : 'à vélo') + ' enregistrée pour l\'instant.</p>'; renderBar(); return; }
+    all.sort(function(a, b){ return b.s - a.s; });
+    var html = '', cur = '', days = [];
+    all.forEach(function(x){
+      var k = dayKey(x.s);
+      if (k !== cur) { cur = k; days.push({ ts: x.s, items: [] }); }
+      days[days.length - 1].items.push(x);
+    });
+    var ua = boat ? 'nm' : 'km';
+    days.forEach(function(g){
+      var dd = 0, dt2 = 0, dl = 0;
+      g.items.forEach(function(x){ dd += x.d; dt2 += x.t; dl += x.l || 0; });
+      html += '<div class="day"><span>' + esc(dayLabel(g.ts)) + '</span><small>' + esc(dist(dd, ua)) + ' · ' + esc(dur(dt2)) + (dl > 0 ? ' · ' + esc(fl(dl)) : '') + '</small></div>';
+      g.items.forEach(function(x){
+        var avg = x.t > 0 ? x.d / (x.t / 1000) * 3.6 : 0;
+        var cls = 's' + (x === sess ? ' off' : '') + (picked.indexOf(x) >= 0 ? ' on' : '');
+        html += '<div class="' + cls + '" data-i="' + all.indexOf(x) + '"><span class="h"><i class="ck"></i>' + hm(x.s) + (x === sess ? ' → en cours' : ' → ' + hm(x.e)) + '</span>' +
+          '<span class="d">' + esc(dist(x.d, x.u)) + '</span>' +
+          '<span class="m">durée ' + esc(dur(x.t)) + ' · moy. ' + esc(spd(avg, x.u)) + ' · max ' + esc(spd(x.v, x.u)) + (x.l > 0 ? ' · ' + esc(fl(x.l)) : '') + '</span></div>';
+      });
+    });
+    elHistoList.innerHTML = html;
+    renderBar();
+  }
+  elHistoList.addEventListener('click', function(e){
+    if (!selMode) return;
+    var row = e.target.closest ? e.target.closest('.s') : null;
+    if (!row) return;
+    var x = rows[+row.getAttribute('data-i')];
+    if (!x || x === sess) return;          // la séance en cours n'est pas sélectionnable
+    var k = picked.indexOf(x);
+    if (k >= 0) picked.splice(k, 1); else picked.push(x);
+    renderHisto();
+  });
+  function openHisto(e){
+    if (e) e.stopPropagation();
+    selMode = false; picked = []; elHisto.classList.remove('sel'); $('histoSel').textContent = 'Sélectionner';
+    histAct = act;                      // on ouvre l'historique de l'activité en cours
+    elMenuHome.hidden = true; elHisto.hidden = false;
+    renderHisto(); elMenu.scrollTop = 0;
+  }
+  function closeHisto(){ elHisto.hidden = true; elMenuHome.hidden = false; refreshSettings(); elMenu.scrollTop = 0; }
+  $('histoBtn').addEventListener('click', openHisto);
+  $('histoBack').addEventListener('click', closeHisto);
+  $('histoSel').addEventListener('click', function(){ setSelMode(!selMode); });
+  $('histoPick').addEventListener('click', function(e){
+    var a = e.target.getAttribute && e.target.getAttribute('data-a');
+    if (!a || a === histAct) return;
+    histAct = a; selMode = false; picked = []; elHisto.classList.remove('sel'); $('histoSel').textContent = 'Sélectionner';
+    renderHisto();
+  });
+
+  /* ---------- Réglages (onglet Menu) ---------- */
+  function refreshSettings(){
+    var b = $('setSun'); b.textContent = sun ? 'Activé' : 'Désactivé'; b.setAttribute('aria-pressed', sun ? 'true' : 'false');
+    Array.prototype.forEach.call(document.querySelectorAll('#menu .seg3'), function(g){
+      var a = g.getAttribute('data-act');
+      Array.prototype.forEach.call(g.children, function(btn){ btn.setAttribute('aria-pressed', btn.getAttribute('data-pr') === modes[a] ? 'true' : 'false'); });
+    });
+    $('calVal').textContent = '×' + String(Math.round(fuelCal * 100) / 100).replace('.', ',');
+  }
+  $('setSun').addEventListener('click', function(){ setSun(!sun); refreshSettings(); });
+  $('setCal').addEventListener('click', function(){ askCal(); refreshSettings(); });
+  Array.prototype.forEach.call(document.querySelectorAll('#menu .seg3'), function(g){
+    g.addEventListener('click', function(e){
+      var pr = e.target.getAttribute && e.target.getAttribute('data-pr');
+      if (!pr) return;
+      var a = g.getAttribute('data-act');
+      modes[a] = pr;
+      try { localStorage.setItem(KEY_PM, JSON.stringify(modes)); } catch(err){}
+      if (a === act) { speedMode = pr; showSpeed(); }
+      refreshSettings();
+    });
+  });
+
+  /* ---------- Onglets : Vélo | Bateau | Menu ---------- */
+  function setAct(a){
+    if (a === act) return;
+    saveState(); closeSess();            // la séance de l'autre activité se termine
+    act = a;
+    odo = store[a].m; rideMs = store[a].t; fuel = store.boat.l || 0;
+    speedMode = modes[a]; fastSince = 0;
+    try { localStorage.setItem(KEY_TAB, a); } catch(e){}
+    closeConfirm(); lastTs = 0;
+    applyUnit();
+    setRun('idle');                      // en changeant d'activité, le comptage repart à l'arrêt
+  }
+  var NAV = { bike: 'tabBike', boat: 'tabBoat', menu: 'tabMenu' };
+  function showTab(t){
+    if (t === 'bike' || t === 'boat') setAct(t);
+    tab = t;
+    elApp.classList.toggle('inmenu', t === 'menu');
+    elMenu.hidden = t !== 'menu';
+    if (t === 'menu') { elHisto.hidden = true; elMenuHome.hidden = false; refreshSettings(); elMenu.scrollTop = 0; }
+    Object.keys(NAV).forEach(function(k){ $(NAV[k]).setAttribute('aria-selected', k === t ? 'true' : 'false'); });
+    placeCtl();
+  }
+  Object.keys(NAV).forEach(function(k){ $(NAV[k]).addEventListener('click', function(){ showTab(k); }); });
+  showTab(act);
+  placeCtl();
+  setTimeout(placeCtl, 300);
+
+  /* ---------- Heure hh:mm (24 h) ---------- */
+  var lastT = '';
+  var lastFix = 0;
+  var lastCall = 0, denied = false, watchId = null, restartAt = 0, startedAt = Date.now();
+  function tick(){
+    var d = new Date();
+    var t = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if (t !== lastT) { setSeg(elTime, t); setSeg(elTimeB, t); lastT = t; }
+    var now = Date.now();
+    if (lastFix && now - lastFix > 8000) {
+      lastKmh = 0; showSpeed();
+      setHead('');
+      setStatus('Signal GPS faible');
+    } else if (!lastFix && !denied) {
+      setStatus('Recherche du GPS… ' + Math.round((now - startedAt) / 1000) + ' s');
+    }
+    if (sess && now - sess.e > SESS_GAP_MS) { closeSess(); setRun('idle'); }   // plus d'une heure sans rouler : séance terminée, comptage arrêté
+    // Chien de garde : si le GPS ne donne plus rien pendant 10 s, on relance le suivi
+    if (!denied && lastCall && now - Math.max(lastCall, restartAt) > 10000) startWatch();
+  }
+  setInterval(tick, 1000);
+  tick();
+
+  function setStatus(msg){
+    if (msg) { elStatus.textContent = msg; elStatus.hidden = false; }
+    else { elStatus.hidden = true; }
+  }
+
+  /* ---------- Compas du bateau ---------- */
+  var rose = null, dialCum = 0, dialPrev = null, dialSeen = false;
+  (function buildDial(){
+    var C = 200, h = '<circle class="d-bg" cx="200" cy="200" r="196"/><g id="rose" style="transform-origin:200px 200px">';
+    function pol(r, a){ var t = a * Math.PI / 180; return [C + r * Math.sin(t), C - r * Math.cos(t)]; }
+    for (var a = 0; a < 360; a += 5) {
+      var len = a % 30 === 0 ? 22 : (a % 10 === 0 ? 14 : 8), w = a % 30 === 0 ? 3.2 : (a % 10 === 0 ? 2.2 : 1.4);
+      var p1 = pol(194, a), p2 = pol(194 - len, a);
+      h += '<line class="d-t" style="stroke-width:' + w + '" x1="' + p1[0].toFixed(1) + '" y1="' + p1[1].toFixed(1) + '" x2="' + p2[0].toFixed(1) + '" y2="' + p2[1].toFixed(1) + '"/>';
+    }
+    var CARD = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' };
+    for (var d = 0; d < 360; d += 30) {
+      if (CARD[d]) h += '<text class="d-c" transform="rotate(' + d + ' 200 200)" x="200" y="74">' + CARD[d] + '</text>';
+      else h += '<text class="d-n" transform="rotate(' + d + ' 200 200)" x="200" y="62">' + d + '</text>';
+    }
+    h += '</g><polygon class="d-l" points="184,0 216,0 200,34"/>';   // ligne de foi : repère fixe, avant du bateau
+    elDial.innerHTML = h;
+    rose = $('rose');
+  })();
+  function updateDial(deg){
+    var stale = (deg === null || typeof deg !== 'number');
+    elDial.classList.toggle('stale', stale); elDialHd.classList.toggle('stale', stale);
+    if (!stale) {
+      var d = ((Math.round(deg) % 360) + 360) % 360;
+      if (dialPrev === null) dialCum = d; else dialCum += ((d - dialPrev + 540) % 360) - 180;   // toujours par le plus court chemin
+      dialPrev = d;
+      rose.style.transform = 'rotate(' + (-dialCum) + 'deg)';
+      setSeg(elDialHd, ('00' + d).slice(-3) + '°');
+      dialSeen = true;
+    } else if (!dialSeen) {
+      setSeg(elDialHd, '---°');
+    }
+  }
+
+  /* ---------- Cap ---------- */
+  var DIRS = ['N','NE','E','SE','S','SW','W','NW'];
+  function dirOf(deg){ return DIRS[Math.round(deg / 45) % 8]; }
+  // t = lettres du cap (N, NE...), deg = cap en degrés (0 à 359). Sans cap : rien (la place reste réservée) ; en pause : PAUSE
+  var lastHead = '', lastDeg = null;
+  function setHead(t, deg){
+    lastHead = t; lastDeg = (typeof deg === 'number' && isFinite(deg)) ? deg : null;
+    var showVal = runState !== 'pause' && !!t;
+    var key = runState === 'pause' ? 'P' : (t ? 'V' : 'A');
+    if (elHmsg._k !== key) {
+      elHmsg._k = key;
+      elHmsg.textContent = '';   // plus de mot « PAUSE » : le bouton ▶ jaune et les chiffres gris suffisent
+    }
+    elHmsg.hidden = showVal;
+    elHval.hidden = !showVal;
+    var label = runState === 'pause' ? 'En pause' : 'Pas de cap';
+    if (showVal) {
+      var d = lastDeg === null ? 0 : ((Math.round(lastDeg) % 360) + 360) % 360;
+      elHl.textContent = t;
+      setSeg(elHd, ('00' + d).slice(-3) + '°');
+      label = 'Cap ' + t + ', ' + d + ' degrés';
+    }
+    elHead.setAttribute('aria-label', label);
+    updateDial(lastDeg);
+  }
+  setHead('');
+
+  /* ---------- Écran « Position » (bateau) ---------- */
+  var elPos = $('pos'), posOpenedAt = 0, posTimer = 0;
+  function fmtDM(v, deg3, pos, neg){      // degrés + minutes décimales : 42° 41,234' N
+    var a = Math.abs(v), d = Math.floor(a), m = Math.round((a - d) * 60 * 1000) / 1000;
+    if (m >= 60) { d += 1; m = 0; }
+    var ds = String(d); while (ds.length < (deg3 ? 3 : 2)) ds = '0' + ds;
+    var ms = m.toFixed(3).replace('.', ','); if (m < 10) ms = '0' + ms;
+    return ds + '° ' + ms + "' " + (v < 0 ? neg : pos);
+  }
+  function renderPos(){
+    var f = posFix, now = new Date();
+    $('pLoc').textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    $('pUtc').textContent = pad2(now.getUTCHours()) + ':' + pad2(now.getUTCMinutes());
+    var age = $('pAge');
+    if (!f) {
+      $('pLat').textContent = '--'; $('pLon').textContent = '--'; $('pDec').textContent = ''; $('pRte').textContent = '';
+      age.textContent = 'Pas de position GPS'; age.className = 'pa bad'; return;
+    }
+    var sec = Math.max(0, Math.round((Date.now() - f.at) / 1000));
+    $('pLat').textContent = fmtDM(f.lat, false, 'N', 'S');
+    $('pLon').textContent = fmtDM(f.lon, true, 'E', 'W');
+    $('pDec').textContent = f.lat.toFixed(5).replace('.', ',') + '  ' + f.lon.toFixed(5).replace('.', ',');
+    var moving = f.spd !== null && f.spd * 1.94384 >= 0.5;
+    var rte = 'Route ' + ((moving && f.hd !== null) ? ('000' + Math.round(f.hd) % 360).slice(-3) + '°' : '—');
+    var kn = f.spd === null ? '—' : (f.spd * 1.94384).toFixed(1).replace('.', ',') + ' nœuds';
+    $('pRte').textContent = rte + '  ·  ' + kn;
+    var txt = sec < 3 ? 'GPS à l\'instant' : 'GPS il y a ' + (sec < 120 ? sec + ' s' : Math.round(sec / 60) + ' min');
+    txt += ' · ± ' + Math.round(f.acc) + ' m';
+    age.textContent = txt; age.className = 'pa' + ((sec > 10 || f.acc > 50) ? ' bad' : '');
+  }
+  function openPos(){
+    renderPos(); elPos.hidden = false; posOpenedAt = Date.now();
+    clearInterval(posTimer); posTimer = setInterval(renderPos, 1000);
+  }
+  function closePos(){
+    if (elPos.hidden || Date.now() - posOpenedAt < 400) return;
+    elPos.hidden = true; clearInterval(posTimer);
+  }
+  $('bPos').addEventListener('click', openPos);
+  elPos.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); closePos(); });
+  document.addEventListener('keydown', function(){ closePos(); });
+
+  /* ---------- Géométrie ---------- */
+  function hav(lat1, lon1, lat2, lon2){
+    var R = 6371000, rad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  /* ---------- GPS ---------- */
+  var anchor = null, lastTs = 0;
+  var win = [];   // derniers points précis (~5 s) : sert à calculer la vitesse quand le GPS ne la fournit pas
+  function pt(p){ return { lat: p.coords.latitude, lon: p.coords.longitude, t: p.timestamp }; }
+
+  function speedFromWindow(p, c){
+    win.push(pt(p));
+    while (win.length > 2 && p.timestamp - win[0].t > 5000) win.shift();
+    if (win.length < 2) return 0;
+    var a = win[0], dtw = (p.timestamp - a.t) / 1000;
+    if (dtw <= 0) return 0;
+    var dw = hav(a.lat, a.lon, c.latitude, c.longitude);
+    return dw >= Math.max(3, c.accuracy * 0.6) ? dw / dtw : 0;   // en dessous : bruit GPS, on est à l'arrêt
+  }
+
+  var posFix = null;   // dernière position reçue (pour l'écran « Position »)
+  function onPos(p){
+    var c = p.coords;
+    lastCall = Date.now();
+    posFix = { lat: c.latitude, lon: c.longitude, acc: c.accuracy,
+               spd: (typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0) ? c.speed : null,
+               hd: (typeof c.heading === 'number' && isFinite(c.heading)) ? c.heading : null, at: Date.now() };
+    if (!elPos.hidden) renderPos();
+    var accOk = c.accuracy <= MAX_ACC;
+    var hasSpeed = typeof c.speed === 'number' && isFinite(c.speed) && c.speed >= 0;   // vitesse mesurée par le GPS (m/s)
+
+    var v;
+    if (hasSpeed) {
+      // La vitesse du GPS reste fiable même quand la position est imprécise : on l'affiche toujours
+      v = c.speed;
+      if (accOk) win.push(pt(p));
+    } else if (accOk) {
+      v = speedFromWindow(p, c);
+    } else {
+      setStatus('Précision GPS faible');
+      return;
+    }
+
+    lastFix = Date.now();
+    setStatus(accOk ? '' : 'Précision GPS faible');
+
+    // Distance : uniquement avec une position précise, et seulement quand on avance
+    if (accOk) {
+      if (paused) {
+        anchor = pt(p);                                     // en pause : rien n'est compté, on suit seulement la position
+      } else if (anchor) {
+        var dt = (p.timestamp - anchor.t) / 1000;
+        var d = hav(anchor.lat, anchor.lon, c.latitude, c.longitude);
+        var thr = Math.max(4, c.accuracy * 0.5);
+        if (dt > 0 && d / dt > 70) {
+          anchor = pt(p);                                   // saut GPS aberrant : on repart d'ici
+        } else if (v * 3.6 >= MIN_KMH && d >= thr) {
+          odo += d; anchor = pt(p); saveState(); showKm();
+          sessAdd(d, 0, p.timestamp, 0);
+        }
+      } else {
+        anchor = pt(p);
+      }
+    }
+
+    var kmh = v * 3.6;
+    if (kmh < 0.8) kmh = 0;
+    lastKmh = kmh; showSpeed();
+
+    // Reprise automatique : en pause, rouler à plus de 12 km/h pendant 5 s relance le comptage
+    if (runState === 'pause' && unit === 'km' && kmh >= RESUME_KMH) {
+      if (!fastSince) fastSince = p.timestamp;
+      else if (p.timestamp - fastSince >= RESUME_MS) setRun('run');
+    } else {
+      fastSince = 0;
+    }
+
+    // Temps de roulage : on ne compte que le temps où l'on avance, hors pause
+    if (!paused && kmh >= MIN_KMH && lastTs) {
+      var dtm = p.timestamp - lastTs;
+      if (dtm > 0 && dtm < 5000) {
+        var dl = 0;
+        if (unit === 'nm') { dl = fuelRate(kmh / 1.852) * fuelCal * dtm / 3600000; fuel += dl; showFuel(); }
+        rideMs += dtm; saveState(); showRide(); sessAdd(0, dtm, p.timestamp, kmh, dl);
+      }
+    }
+    lastTs = p.timestamp;
+
+    if (kmh < MIN_KMH) {
+      setHead('');
+    } else if (typeof c.heading === 'number' && isFinite(c.heading)) {
+      setHead(dirOf(c.heading), c.heading);
+    }
+  }
+
+  function startWatch(){
+    try { if (watchId !== null) navigator.geolocation.clearWatch(watchId); } catch(e){}
+    restartAt = Date.now();
+    watchId = navigator.geolocation.watchPosition(onPos, onErr,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  }
+
+  function onErr(e){
+    if (e && e.code === 1) {
+      denied = true;
+      setStatus('Autorisez la localisation');
+    } else if (Date.now() - restartAt > 5000) {
+      startWatch();   // délai dépassé ou position indisponible : on relance le suivi
+    }
+  }
+
+  if ('geolocation' in navigator) {
+    startWatch();
+  } else {
+    setStatus('GPS indisponible sur cet appareil');
+  }
+
+  /* ---------- Écran toujours allumé ---------- */
+  function lock(){
+    try {
+      if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(function(){});
+    } catch(e){}
+  }
+  lock();
+  document.addEventListener('pointerdown', lock, { once: true });
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') lock();
+  });
+})();
+</script>
+</body>
+</html>
+
 <html lang="fr">
 <head>
 <meta charset="utf-8">
