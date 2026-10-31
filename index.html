@@ -255,6 +255,7 @@
   #histo{font-size:inherit}
   #histo .wrap{display:flex;flex-direction:column;gap:1.4vh}
   #histo .top{display:flex;align-items:center;justify-content:space-between;gap:.6em}
+  #histoPick{display:none!important}
   #histo .pick{display:flex;gap:.4em}
   #histo .pick button{flex:1;font-weight:700}
   #histo .pick button[aria-pressed=true]{background:var(--speed);border-color:var(--speed);color:#000;opacity:1;font-weight:800}
@@ -384,17 +385,13 @@
         <section class="card2">
           <h3>Réglages</h3>
           <div class="set"><span>Mode plein soleil</span><button id="setSun" type="button"></button></div>
-          <div class="set"><span>Vitesse vélo</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
-          <div class="set"><span>Vitesse bateau</span><div class="seg3" data-act="boat"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
-          <div class="set"><span>Calibrage conso <small id="calVal"></small></span><button id="setCal" type="button">Régler</button></div>
+          <div class="set"><span>Vitesse</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
         </section>
 
         <section class="card2">
           <h3>Aide</h3>
           <ul>
-            <li><b class="c-speed">Onglets Vélo et Bateau</b><span>Chacun a ses propres compteurs (trip, temps, litres). Seul l'onglet affiché compte. Bateau : compas à rose tournante ; le cap vient du GPS (route sur le fond), il se fige à l'arrêt.</span></li>
-            <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps, litres et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h à vélo). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
-            <li><b class="c-trip">Litres (bateau)</b><span>Consommation estimée. Appui long : calibrage (ou dans Réglages).</span></li>
+                        <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
             <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
           </ul>
         </section>
@@ -414,7 +411,6 @@
 
     <nav id="nav" role="tablist" aria-label="Onglets">
       <button id="tabBike" type="button" role="tab" aria-selected="true"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="21" r="5.5"/><circle cx="24" cy="21" r="5.5"/><path d="M8 21 L13 11 H20 L24 21 M13 11 L17.5 21 H8 M12 8 H15 M20 11 L18.5 7.5 H22"/></svg><span>Vélo</span></button>
-      <button id="tabBoat" type="button" role="tab" aria-selected="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 22 H28 L24 27 H8 Z M16 4 V22 M16 6 L26 19 H16 M14 10 L7 19 H14"/></svg><span>Bateau</span></button>
       <button id="tabMenu" type="button" role="tab" aria-selected="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 9 H27 M5 16 H27 M5 23 H27"/></svg><span>Menu</span></button>
     </nav>
   </main>
@@ -560,7 +556,7 @@
     store.bike.m = +store.bike.m || 0; store.bike.t = +store.bike.t || 0;
     store.boat.m = +store.boat.m || 0; store.boat.t = +store.boat.t || 0; store.boat.l = +store.boat.l || 0;
     var tb = localStorage.getItem(KEY_TAB);
-    act = (tb === 'boat' || tb === 'bike') ? tb : legacyAct;
+    act = 'bike';
     var okm = function(v){ return v === 'd1' || v === 'd2' || v === 'plus' || v === 'int'; };
     var pm = JSON.parse(localStorage.getItem(KEY_PM) || 'null');
     if (pm && okm(pm.bike) && okm(pm.boat)) modes = pm;
@@ -980,10 +976,8 @@
       var a = g.getAttribute('data-act');
       Array.prototype.forEach.call(g.children, function(btn){ btn.setAttribute('aria-pressed', btn.getAttribute('data-pr') === modes[a] ? 'true' : 'false'); });
     });
-    $('calVal').textContent = '×' + String(Math.round(fuelCal * 100) / 100).replace('.', ',');
   }
   $('setSun').addEventListener('click', function(){ setSun(!sun); refreshSettings(); });
-  $('setCal').addEventListener('click', function(){ askCal(); refreshSettings(); });
   Array.prototype.forEach.call(document.querySelectorAll('#menu .seg3'), function(g){
     g.addEventListener('click', function(e){
       var pr = e.target.getAttribute && e.target.getAttribute('data-pr');
@@ -1008,7 +1002,7 @@
     applyUnit();
     setRun('idle');                      // en changeant d'activité, le comptage repart à l'arrêt
   }
-  var NAV = { bike: 'tabBike', boat: 'tabBoat', menu: 'tabMenu' };
+  var NAV = { bike: 'tabBike', menu: 'tabMenu' };
   function showTab(t){
     if (t === 'bike' || t === 'boat') setAct(t);
     tab = t;
