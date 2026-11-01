@@ -27,7 +27,7 @@
     --panel-clock:#FFF3BF;   /*   jaune très clair */
     --sp-h:min(29vw,18vh);   /* hauteur des chiffres de la vitesse */
     --dim:#9a9a9a;
-    --dial-bg:#070707; --dial-ink:#FFFFFF; --dial-rim:#3c3c3c; --lubber:#FF3B30;   /* compas du bateau */
+    --dial-bg:#070707; --dial-ink:#FFFFFF; --dial-rim:#3c3c3c; --lubber:#FF3B30; --g-fine:#8f979d;   /* compas du bateau */
   }
   [hidden]{display:none!important}
   html,body{height:100%;margin:0;background:var(--bg);color:var(--time)}
@@ -89,6 +89,23 @@
   #app.idle #km,#app.idle #ride,#app.idle #fuel{color:var(--paused)}   /* arrêté : compteurs en gris, la vitesse reste en couleur */
   #speed{cursor:pointer}
 
+  /* Compteur à aiguille (vélo) : arc gradué de 0 à 60 km/h, vitesse numérique au centre, sous l'axe de l'aiguille */
+  #app:not(.boat){--GW:min(94vw,420px,45vh);--sp-h:calc(var(--GW) * .165)}
+  #app:not(.boat) #topBlock{--panel:var(--panel-speed);display:flex;justify-content:center;height:calc(var(--GW) * .75)}
+  #gauge{display:none}
+  #app:not(.boat) #gauge{display:block;width:var(--GW);height:100%;overflow:visible}
+  #app:not(.boat) #rowSpeed{position:absolute;left:0;right:0;top:67.4%;width:100%}
+  #app:not(.boat) #rowSpeed::before{display:none}
+  #gBand path{fill:none;stroke-width:11}
+  #app.sun #gBand{filter:brightness(.8) saturate(1.15)}   /* bande un peu plus sombre sur fond clair */
+  #gauge .t1{stroke:var(--g-fine);stroke-width:1.2}
+  #gauge .t5{stroke:var(--dial-ink);stroke-width:3.2}
+  #gauge .gn{fill:var(--dial-ink);font:700 19px ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;text-anchor:middle}
+  #gauge .nd{fill:var(--lubber);stroke:var(--dial-bg);stroke-width:1.5;stroke-linejoin:round}
+  #gauge .hub{fill:var(--dial-bg);stroke:var(--lubber);stroke-width:3}
+  #gauge .hubc{fill:var(--lubber)}
+  #gNeedle{transition:transform .35s ease-out}
+
   /* Mode soleil (appui sur l'heure) : trois cadrans clairs derrière les blocs, chiffres foncés.
      Les cadrans sont dessinés derrière le contenu : aucun affichage ne bouge. */
   .panel{position:relative;isolation:isolate}
@@ -101,7 +118,7 @@
   #app.sun #toast{background:#fff;color:#000;border-color:#000}
   .trip{--panel:var(--panel-trip)}
   .clock{--panel:var(--panel-clock);cursor:pointer}
-  #app.sun{--dial-bg:#FFFBEB;--dial-ink:#101010;--dial-rim:#6b5a20;--lubber:#C4001A;--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
+  #app.sun{--g-fine:#4d4a3a;--dial-bg:#FFFBEB;--dial-ink:#101010;--dial-rim:#6b5a20;--lubber:#C4001A;--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
   #app.sun .seg .off{opacity:.045}
   #app.sun .clock::before{inset:-1.2vh 4vw -0.45vh}   /* cadran de l'heure un peu moins haut en bas, pour laisser la place aux boutons */
   #app.sun #hold{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
@@ -306,10 +323,11 @@
   <div id="status" role="status">Recherche du GPS…</div>
 
   <main id="app">
-    <div id="topBlock" class="scr">
+    <div id="topBlock" class="scr panel">
+      <svg id="gauge" viewBox="20 24 360 270" role="img" aria-label="Compteur de vitesse"></svg>
       <svg id="dial" viewBox="0 0 400 400" role="img" aria-label="Compas" aria-hidden="false"></svg>
       <svg id="dialHd" class="seg" role="img" aria-label="Cap en degrés"></svg>
-      <section class="row panel scr" id="rowSpeed">
+      <section class="row scr" id="rowSpeed">
         <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
         <span id="u1" class="side" aria-label="Unité">km/h</span>
       </section>
@@ -614,7 +632,45 @@
   function fmtRideBoat(ms){ var m = Math.floor(ms / 60000); return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); }   // bateau : hh:mm
   function showRide(){ setSeg(elRide, act === 'boat' ? fmtRideBoat(rideMs) : fmtRide(rideMs)); }
   // Vitesse : mesurée en km/h en interne, convertie en nœuds à l'affichage (1 kn = 1,852 km/h)
-  function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh), true); }
+  function showSpeed(){ setSeg(elSpeed, fmtSpeed(unit === 'nm' ? lastKmh / 1.852 : lastKmh), true); setGauge(lastKmh); }
+  /* Compteur à aiguille : 0 à 45 km/h sur 200° (de 190° à -10°). Bande de couleur en dégradé : vert jusqu'à 22,
+     jaune puis orange de 22 à 30, rouge au-delà. L'aiguille glisse en douceur. */
+  var G_MAX = 45, G_A0 = 190, G_A1 = -10, elGauge = $('gauge'), gNeedle = null;
+  var G_STOPS = [[0,[31,216,74]],[17,[70,222,60]],[22,[245,230,42]],[26,[255,176,32]],[30,[255,122,26]],[33,[240,48,30]],[45,[205,16,40]]];   // km/h → couleur
+  function gColor(v){
+    var S = G_STOPS, i = 1;
+    while (i < S.length - 1 && v > S[i][0]) i++;
+    var a = S[i-1], b = S[i], t = Math.max(0, Math.min(1, (v - a[0]) / (b[0] - a[0])));
+    return 'rgb(' + [0,1,2].map(function(k){ return Math.round(a[1][k] + (b[1][k] - a[1][k]) * t); }).join(',') + ')';
+  }
+  function buildGauge(){
+    var cx = 200, cy = 196, R = 158, h = '';
+    function P(r, a){ var t = a * Math.PI / 180; return (cx + r * Math.cos(t)).toFixed(2) + ',' + (cy - r * Math.sin(t)).toFixed(2); }
+    function ang(v){ return G_A0 + (G_A1 - G_A0) * v / G_MAX; }
+    var Rb = R - 5.5, N = 180, i;
+    h += '<g id="gBand">';
+    for (i = 0; i < N; i++) {                       // 180 petits arcs de couleur : dégradé continu le long de la bande
+      var v0 = G_MAX * i / N, v1 = G_MAX * (i + 1) / N + 0.12;
+      h += '<path d="M' + P(Rb, ang(v0)) + ' A' + Rb + ',' + Rb + ' 0 0 1 ' + P(Rb, ang(Math.min(v1, G_MAX))) + '" stroke="' + gColor((v0 + v1) / 2) + '"/>';
+    }
+    h += '</g>';
+    for (var v = 0; v <= G_MAX; v++) {
+      var big = v % 5 === 0, l = big ? 18 : 8, a = ang(v);
+      var p0 = P(R - 13, a).split(','), p1 = P(R - 13 - l, a).split(',');
+      h += '<line class="' + (big ? 't5' : 't1') + '" x1="' + p0[0] + '" y1="' + p0[1] + '" x2="' + p1[0] + '" y2="' + p1[1] + '"/>';
+      if (big) { var q = P(R - 13 - l - 15, a).split(','); h += '<text class="gn" x="' + q[0] + '" y="' + (+q[1] + 6.5).toFixed(2) + '">' + v + '</text>'; }
+    }
+    h += '<g id="gNeedle" style="transform-origin:' + cx + 'px ' + cy + 'px"><polygon class="nd" points="' + cx + ',' + (cy - 5) + ' ' + (cx + R - 8) + ',' + cy + ' ' + cx + ',' + (cy + 5) + ' ' + (cx - 26) + ',' + cy + '"/></g>';
+    h += '<circle class="hub" cx="' + cx + '" cy="' + cy + '" r="12"/><circle class="hubc" cx="' + cx + '" cy="' + cy + '" r="3.5"/>';
+    elGauge.innerHTML = h;
+    gNeedle = $('gNeedle');
+  }
+  function setGauge(kmh){
+    if (!gNeedle) return;
+    var v = Math.max(0, Math.min(G_MAX, kmh));   // en butée au-delà de 45 km/h (la vitesse numérique continue)
+    gNeedle.style.transform = 'rotate(' + (-G_A0 + (G_A0 - G_A1) * v / G_MAX).toFixed(2) + 'deg)';
+  }
+  buildGauge();
   function applyUnit(){
     unit = act === 'boat' ? 'nm' : 'km';
     elU1.textContent = unit === 'nm' ? 'knots' : 'km/h';
