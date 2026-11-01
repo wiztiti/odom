@@ -92,18 +92,21 @@
   /* Compteur à aiguille (vélo) : arc gradué de 0 à 60 km/h, vitesse numérique au centre, sous l'axe de l'aiguille */
   #app:not(.boat){--GW:min(94vw,420px,45vh);--sp-h:calc(var(--GW) * .165)}
   #app:not(.boat) #topBlock{--panel:var(--panel-speed);display:flex;justify-content:center;height:calc(var(--GW) * .75)}
-  #gauge{display:none}
+  #gauge,#gaugeTop{display:none}
   #app:not(.boat) #gauge{display:block;width:var(--GW);height:100%;overflow:visible}
-  #app:not(.boat) #rowSpeed{position:absolute;left:0;right:0;top:67.4%;width:100%}
+  #app:not(.boat) #rowSpeed{position:absolute;left:0;right:0;top:35.5%;width:100%}
+  #app:not(.boat) #u1{display:none}   /* pas d'unité à côté des chiffres : la vitesse est en km/h */
   #app:not(.boat) #rowSpeed::before{display:none}
+  /* aiguille et axe dans une couche au-dessus des chiffres : ils passent par-dessus la vitesse */
+  #app:not(.boat) #gaugeTop{display:block;position:absolute;top:0;left:50%;width:var(--GW);height:100%;transform:translateX(-50%);overflow:visible;pointer-events:none;z-index:3}
   #gBand path{fill:none;stroke-width:11}
   #app.sun #gBand{filter:brightness(.8) saturate(1.15)}   /* bande un peu plus sombre sur fond clair */
   #gauge .t1{stroke:var(--g-fine);stroke-width:1.2}
   #gauge .t5{stroke:var(--dial-ink);stroke-width:3.2}
   #gauge .gn{fill:var(--dial-ink);font:700 19px ui-rounded,"SF Pro Rounded","Helvetica Neue",Arial,sans-serif;text-anchor:middle}
-  #gauge .nd{fill:var(--lubber);stroke:var(--dial-bg);stroke-width:1.5;stroke-linejoin:round}
-  #gauge .hub{fill:var(--dial-bg);stroke:var(--lubber);stroke-width:3}
-  #gauge .hubc{fill:var(--lubber)}
+  #gaugeTop .nd{fill:var(--lubber);stroke:var(--dial-bg);stroke-width:1.5;stroke-linejoin:round}
+  #gaugeTop .hub{fill:var(--dial-bg);stroke:var(--lubber);stroke-width:3}
+  #gaugeTop .hubc{fill:var(--lubber)}
   #gNeedle{transition:transform .35s ease-out}
 
   /* Mode soleil (appui sur l'heure) : trois cadrans clairs derrière les blocs, chiffres foncés.
@@ -331,6 +334,7 @@
         <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
         <span id="u1" class="side" aria-label="Unité">km/h</span>
       </section>
+      <svg id="gaugeTop" viewBox="20 24 360 270" aria-hidden="true"></svg>
     </div>
     <svg id="timeB" class="seg scr" role="img" aria-label="Heure"></svg>
 
@@ -658,11 +662,12 @@
       var big = v % 5 === 0, l = big ? 18 : 8, a = ang(v);
       var p0 = P(R - 13, a).split(','), p1 = P(R - 13 - l, a).split(',');
       h += '<line class="' + (big ? 't5' : 't1') + '" x1="' + p0[0] + '" y1="' + p0[1] + '" x2="' + p1[0] + '" y2="' + p1[1] + '"/>';
-      if (big) { var q = P(R - 13 - l - 15, a).split(','); h += '<text class="gn" x="' + q[0] + '" y="' + (+q[1] + 6.5).toFixed(2) + '">' + v + '</text>'; }
+      if (v % 10 === 0) { var q = P(R - 13 - l - 15, a).split(','); h += '<text class="gn" x="' + q[0] + '" y="' + (+q[1] + 6.5).toFixed(2) + '">' + v + '</text>'; }
     }
-    h += '<g id="gNeedle" style="transform-origin:' + cx + 'px ' + cy + 'px"><polygon class="nd" points="' + cx + ',' + (cy - 5) + ' ' + (cx + R - 8) + ',' + cy + ' ' + cx + ',' + (cy + 5) + ' ' + (cx - 26) + ',' + cy + '"/></g>';
-    h += '<circle class="hub" cx="' + cx + '" cy="' + cy + '" r="12"/><circle class="hubc" cx="' + cx + '" cy="' + cy + '" r="3.5"/>';
     elGauge.innerHTML = h;
+    h = '<g id="gNeedle" style="transform-origin:' + cx + 'px ' + cy + 'px"><polygon class="nd" points="' + cx + ',' + (cy - 5) + ' ' + (cx + R - 8) + ',' + cy + ' ' + cx + ',' + (cy + 5) + ' ' + (cx - 26) + ',' + cy + '"/></g>';
+    h += '<circle class="hub" cx="' + cx + '" cy="' + cy + '" r="12"/><circle class="hubc" cx="' + cx + '" cy="' + cy + '" r="3.5"/>';
+    $('gaugeTop').innerHTML = h;
     gNeedle = $('gNeedle');
   }
   function setGauge(kmh){
