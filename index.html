@@ -65,20 +65,11 @@
   /* Un appui sur le bloc trip propose la remise à zéro */
   .trip{position:relative;cursor:pointer}
   .trip:focus-visible{outline:3px solid #fff;outline-offset:4px}
-  #confirm{
-    position:absolute;left:0;right:0;top:-1.5vh;bottom:-1.5vh;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.6vh;
-    background:var(--bg);cursor:default;
-  }
-  #confirm p{margin:0;font-size:min(6vw,3.8vh);font-weight:700;color:var(--km)}
-  #confirm .btns{display:flex;gap:4vw}
-  #confirm button{
-    font:inherit;font-size:min(5vw,3.2vh);font-weight:800;letter-spacing:.04em;
-    min-width:min(28vw,16vh);padding:.55em 1em;border-radius:999px;cursor:pointer;
-  }
-  #yes{background:var(--km);color:#000;border:2px solid var(--km)}
-  #no{background:transparent;color:var(--time);border:2px solid rgba(255,255,255,.6)}
-  #confirm button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  #hold{position:absolute;left:0;right:0;top:-1.5vh;bottom:-1.5vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4vh;background:var(--bg);cursor:default}
+  #hold p{margin:0;font-size:min(6vw,3.8vh);font-weight:700;color:var(--km)}
+  #hold .bar{width:min(70vw,38vh);height:min(4vw,2.2vh);border:2px solid var(--km);border-radius:999px;overflow:hidden;box-sizing:border-box}
+  #hold .bar i{display:block;width:100%;height:100%;background:var(--km);transform:scaleX(0);transform-origin:left center}
+  #bReset{-webkit-touch-callout:none}
   /* "trip" au-dessus de "km", en plus petit ; le bas de "km" s'aligne sur le bas des chiffres */
   #u2,#u3{
     display:flex;flex-direction:column;align-items:flex-start;gap:.3em;align-self:end;margin-bottom:-.2em;
@@ -110,10 +101,8 @@
   #app.sun{--dial-bg:#FFFBEB;--dial-ink:#101010;--dial-rim:#6b5a20;--lubber:#C4001A;--speed:#0A2F55;--km:#0B4A1F;--ride:#7A1060;--time:#101010;--cap:#4A3A00;--fuel:#8A3F00;--paused:#56626B}
   #app.sun .seg .off{opacity:.045}
   #app.sun .clock::before{inset:-1.2vh 4vw -0.45vh}   /* cadran de l'heure un peu moins haut en bas, pour laisser la place aux boutons */
-  #app.sun #confirm{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
-  #app.sun #confirm p{color:var(--km)}
-  #app.sun #yes{background:var(--km);border-color:var(--km);color:#fff}
-  #app.sun #no{color:#101010;border-color:rgba(16,16,16,.55)}
+  #app.sun #hold{left:4vw;right:4vw;top:-2.4vh;bottom:-2.4vh;border-radius:24px;background:var(--panel-trip)}
+  #app.sun #hold p{color:var(--km)}
 
   /* Compas du bateau (onglet Bateau) : rose classique qui tourne derrière une ligne de foi fixe ; vitesse au centre */
   #app.boat{--D:min(92vw,42vh);--sp-h:calc(var(--D) * .26);
@@ -339,12 +328,9 @@
         <span id="u3" class="side"><small>conso</small><span>litres</span></span>
       </section>
 
-      <div id="confirm" hidden>
-        <p>remettre à zéro ?</p>
-        <div class="btns">
-          <button id="yes" type="button">Oui</button>
-          <button id="no" type="button">Non</button>
-        </div>
+      <div id="hold" hidden>
+        <p>remise à zéro…</p>
+        <div class="bar"><i id="holdFill"></i></div>
       </div>
     </div>
 
@@ -391,7 +377,7 @@
         <section class="card2">
           <h3>Aide</h3>
           <ul>
-                        <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip, avec confirmation. ☀ : mode plein soleil (cadrans clairs).</span></li>
+                        <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip : maintenir 2 s, la barre se remplit (relâcher avant la fin annule). ☀ : mode plein soleil (cadrans clairs).</span></li>
             <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
           </ul>
         </section>
@@ -446,7 +432,7 @@
   var elSpeed = $('speed'), elKm = $('km'), elRide = $('ride'), elFuel = $('fuel'), elRowFuel = $('rowFuel'), elTime = $('time'), elTimeB = $('timeB'), elDial = $('dial'), elDialHd = $('dialHd'),
       elHead = $('head'), elStatus = $('status'),
       elU1 = $('u1'), elU2u = $('u2u'),
-      elTrip = $('trip'), elConfirm = $('confirm'), elYes = $('yes'), elNo = $('no'),
+      elTrip = $('trip'),
       elApp = $('app'), elRowSpeed = $('rowSpeed'), elClock = $('clock'),
       elMenu = $('menu'), elMenuHome = $('menuHome'),
       elHmsg = $('hmsg'), elHval = $('hval'), elHl = $('hl'), elHd = $('hd');
@@ -645,17 +631,51 @@
   applyUnit();
   if (sess && (sess.u === 'nm') !== (act === 'boat')) closeSess();   // séance restée ouverte d'une autre activité
 
-  /* ---------- Remise à zéro : appui sur le trip, puis confirmation ---------- */
-  var confirmTimer = null;
-  function openConfirm(){
-    elConfirm.hidden = false;
-    clearTimeout(confirmTimer);
-    confirmTimer = setTimeout(closeConfirm, 6000);   // sans réponse, la question disparaît
+  /* ---------- Remise à zéro : maintenir ↺ pendant 2 s, une barre se remplit sur le bloc trip ---------- */
+  var HOLD_MS = 2000;       // durée du maintien
+  var HOLD_SHOW_MS = 250;   // la barre n'apparaît qu'après ce délai
+  var elReset = document.getElementById('bReset'), elHold = document.getElementById('hold'), elHoldFill = document.getElementById('holdFill');
+  var holdOn = false, holdT0 = 0, holdRaf = 0;
+  function holdStep(){
+    if (!holdOn) return;
+    var dt = performance.now() - holdT0;
+    if (dt >= HOLD_MS) { holdDone(); return; }
+    if (dt >= HOLD_SHOW_MS) elHold.hidden = false;
+    elHoldFill.style.transform = 'scaleX(' + (dt / HOLD_MS).toFixed(3) + ')';
+    holdRaf = requestAnimationFrame(holdStep);
   }
-  function closeConfirm(){
-    clearTimeout(confirmTimer);
-    elConfirm.hidden = true;
+  function holdStart(e){
+    if (holdOn) return;
+    holdOn = true; holdT0 = performance.now();
+    elHoldFill.style.transform = 'scaleX(0)';
+    holdRaf = requestAnimationFrame(holdStep);
   }
+  function holdStop(){
+    holdOn = false; cancelAnimationFrame(holdRaf);
+    elHold.hidden = true; elHoldFill.style.transform = 'scaleX(0)';
+  }
+  function holdCancel(){
+    if (!holdOn) return;
+    var brief = performance.now() - holdT0 < HOLD_SHOW_MS;
+    holdStop();
+    if (brief) toast('Maintenir ↺ pour remettre à zéro');
+  }
+  function holdDone(){
+    holdStop();
+    if (navigator.vibrate) { try { navigator.vibrate(60); } catch(e){} }
+    odo = 0; rideMs = 0; fuel = 0; saveState(); showKm(); showRide(); showFuel();
+    closeSess();   // la remise à zéro termine la séance en cours
+    toast('Remise à zéro');
+  }
+  elReset.addEventListener('pointerdown', holdStart);
+  elReset.addEventListener('pointerup', holdCancel);
+  elReset.addEventListener('pointercancel', holdCancel);
+  elReset.addEventListener('pointermove', function(e){
+    if (!holdOn) return;
+    var r = elReset.getBoundingClientRect();
+    if (e.clientX < r.left - 14 || e.clientX > r.right + 14 || e.clientY < r.top - 14 || e.clientY > r.bottom + 14) holdCancel();
+  });
+  elReset.addEventListener('contextmenu', function(e){ e.preventDefault(); });
   /* Appui long sur les litres : calibrage (coefficient appliqué à toute la table) */
   var fuelTimer = 0, fuelLong = false, fuelSwallow = false;
   function askCal(){
@@ -683,11 +703,6 @@
   });
   ['pointercancel','pointerleave'].forEach(function(n){ elRowFuel.addEventListener(n, function(){ clearTimeout(fuelTimer); fuelLong = false; }); });
   elRowFuel.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-  elYes.addEventListener('click', function(){
-    odo = 0; rideMs = 0; fuel = 0; saveState(); showKm(); showRide(); showFuel(); closeConfirm();
-    closeSess();   // la remise à zéro termine la séance en cours
-  });
-  elNo.addEventListener('click', closeConfirm);
 
   /* ---------- État du comptage : arrêté (idle) · en marche (run) · pause ----------
      Rien n'est compté (trip, temps, litres, séance) tant qu'on n'a pas appuyé sur ▶. */
@@ -710,7 +725,6 @@
     setRun('run');
     if (fresh) toast('Comptage démarré');
   });
-  $('bReset').addEventListener('click', openConfirm);
   $('bStop').addEventListener('click', function(){
     if (!sess) { setRun('idle'); toast('Aucune séance en cours'); return; }
     var ok = sess.d >= SESS_MIN_M;
@@ -998,7 +1012,7 @@
     odo = store[a].m; rideMs = store[a].t; fuel = store.boat.l || 0;
     speedMode = modes[a]; fastSince = 0;
     try { localStorage.setItem(KEY_TAB, a); } catch(e){}
-    closeConfirm(); lastTs = 0;
+    holdStop(); lastTs = 0;
     applyUnit();
     setRun('idle');                      // en changeant d'activité, le comptage repart à l'arrêt
   }
