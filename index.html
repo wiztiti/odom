@@ -90,11 +90,11 @@
   #speed{cursor:pointer}
 
   /* Compteur à aiguille (vélo) : arc gradué de 0 à 60 km/h, vitesse numérique au centre, sous l'axe de l'aiguille */
-  #app:not(.boat){--GW:min(94vw,420px,45vh);--sp-h:calc(var(--GW) * .165)}
-  #app:not(.boat) #topBlock{--panel:var(--panel-speed);display:flex;justify-content:center;height:calc(var(--GW) * .75)}
+  #app:not(.boat){--GW:min(94vw,420px,45vh);--sp-h:calc(var(--GW) * .178)}
+  #app:not(.boat) #topBlock{--panel:var(--panel-speed);display:flex;justify-content:center;height:calc(var(--GW) * .6667)}
   #gauge,#gaugeTop{display:none}
   #app:not(.boat) #gauge{display:block;width:var(--GW);height:100%;overflow:visible}
-  #app:not(.boat) #rowSpeed{position:absolute;left:0;right:0;top:35.5%;width:100%}
+  #app:not(.boat) #rowSpeed{position:absolute;left:0;right:0;top:35.8%;width:100%}
   #app:not(.boat) #u1{display:none}   /* pas d'unité à côté des chiffres : la vitesse est en km/h */
   #app:not(.boat) #rowSpeed::before{display:none}
   /* aiguille et axe dans une couche au-dessus des chiffres : ils passent par-dessus la vitesse */
@@ -327,14 +327,14 @@
 
   <main id="app">
     <div id="topBlock" class="scr panel">
-      <svg id="gauge" viewBox="20 24 360 270" role="img" aria-label="Compteur de vitesse"></svg>
+      <svg id="gauge" viewBox="20 38 360 240" role="img" aria-label="Compteur de vitesse"></svg>
       <svg id="dial" viewBox="0 0 400 400" role="img" aria-label="Compas" aria-hidden="false"></svg>
       <svg id="dialHd" class="seg" role="img" aria-label="Cap en degrés"></svg>
       <section class="row scr" id="rowSpeed">
         <svg id="speed" class="num seg" role="img" aria-label="Vitesse"></svg>
         <span id="u1" class="side" aria-label="Unité">km/h</span>
       </section>
-      <svg id="gaugeTop" viewBox="20 24 360 270" aria-hidden="true"></svg>
+      <svg id="gaugeTop" viewBox="20 38 360 240" aria-hidden="true"></svg>
     </div>
     <svg id="timeB" class="seg scr" role="img" aria-label="Heure"></svg>
 
@@ -648,7 +648,7 @@
     return 'rgb(' + [0,1,2].map(function(k){ return Math.round(a[1][k] + (b[1][k] - a[1][k]) * t); }).join(',') + ')';
   }
   function buildGauge(){
-    var cx = 200, cy = 196, R = 158, h = '';
+    var cx = 200, cy = 210, R = 158, h = '';
     function P(r, a){ var t = a * Math.PI / 180; return (cx + r * Math.cos(t)).toFixed(2) + ',' + (cy - r * Math.sin(t)).toFixed(2); }
     function ang(v){ return G_A0 + (G_A1 - G_A0) * v / G_MAX; }
     var Rb = R - 5.5, N = 180, i;
