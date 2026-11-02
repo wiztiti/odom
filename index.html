@@ -70,8 +70,12 @@
   .trip:focus-visible{outline:3px solid #fff;outline-offset:4px}
   #hold{position:absolute;left:0;right:0;top:-1.5vh;bottom:-1.5vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4vh;background:var(--bg);cursor:default}
   #hold p{margin:0;font-size:min(6vw,3.8vh);font-weight:700;color:var(--km)}
-  #hold .bar{width:min(70vw,38vh);height:min(4vw,2.2vh);border:2px solid var(--km);border-radius:999px;overflow:hidden;box-sizing:border-box}
-  #hold .bar i{display:block;width:100%;height:100%;background:var(--km);transform:scaleX(0);transform-origin:left center}
+  #hold .bar{width:min(70vw,38vh);height:min(4vw,2.2vh);border:2px solid rgba(255,255,255,.55);border-radius:999px;overflow:hidden;box-sizing:border-box}
+  /* Même dégradé que la bande du compteur (vert → jaune → orange → rouge) ; la barre le découvre de gauche à droite */
+  #hold .bar i{display:block;width:100%;height:100%;clip-path:inset(0 100% 0 0);
+    background:linear-gradient(to right,rgb(31,216,74) 0%,rgb(70,222,60) 38%,rgb(245,230,42) 49%,rgb(255,176,32) 58%,rgb(255,122,26) 67%,rgb(240,48,30) 73%,rgb(205,16,40) 100%)}
+  #app.sun #hold .bar{border-color:rgba(16,16,16,.55)}
+  #app.sun #hold .bar i{filter:brightness(.8) saturate(1.15)}
   #bReset{-webkit-touch-callout:none}
   /* "trip" au-dessus de "km", en plus petit ; le bas de "km" s'aligne sur le bas des chiffres */
   #u2,#u3{
@@ -694,18 +698,18 @@
     var dt = performance.now() - holdT0;
     if (dt >= HOLD_MS) { holdDone(); return; }
     if (dt >= HOLD_SHOW_MS) elHold.hidden = false;
-    elHoldFill.style.transform = 'scaleX(' + (dt / HOLD_MS).toFixed(3) + ')';
+    elHoldFill.style.clipPath = 'inset(0 ' + (100 - dt / HOLD_MS * 100).toFixed(1) + '% 0 0)';
     holdRaf = requestAnimationFrame(holdStep);
   }
   function holdStart(e){
     if (holdOn) return;
     holdOn = true; holdT0 = performance.now();
-    elHoldFill.style.transform = 'scaleX(0)';
+    elHoldFill.style.clipPath = 'inset(0 100% 0 0)';
     holdRaf = requestAnimationFrame(holdStep);
   }
   function holdStop(){
     holdOn = false; cancelAnimationFrame(holdRaf);
-    elHold.hidden = true; elHoldFill.style.transform = 'scaleX(0)';
+    elHold.hidden = true; elHoldFill.style.clipPath = 'inset(0 100% 0 0)';
   }
   function holdCancel(){
     if (!holdOn) return;
