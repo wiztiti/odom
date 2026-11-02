@@ -218,6 +218,14 @@
   #app.sun #pos .pa{color:#0B6B2C}
   #app.sun #pos .pa.bad{color:#B00020}
 
+  /* Voyant de séance (coin haut gauche) : point rouge qui respire = comptage en marche ; orange fixe = pause ; anneau gris vide = arrêté */
+  #rec{position:fixed;z-index:6;top:calc(env(safe-area-inset-top) + 2.2vh);left:max(5vw,calc(env(safe-area-inset-left) + 12px));width:28px;height:28px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  #rec i{display:block;width:14px;height:14px;box-sizing:border-box;border-radius:50%;background:#FF3B30;animation:recBreath 2.2s ease-in-out infinite}
+  @keyframes recBreath{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,.55);transform:scale(1);opacity:1}50%{box-shadow:0 0 0 8px rgba(255,59,48,0);transform:scale(1.12);opacity:.8}}
+  #app.paused #rec i{background:#FF9F1C;animation:none}
+  #app.idle #rec i{background:transparent;border:2px solid #6b747a;animation:none}
+  @media (prefers-reduced-motion:reduce){#rec i{animation:none}}
+
   /* Bouton menu (≡) : cinquième bouton de la barre du bas */
   #mBtn{--c:#F2F2F2}
   #mBtn svg{fill:none;stroke:currentColor;stroke-width:2.8;stroke-linecap:round;width:46%;height:60%}
@@ -367,6 +375,7 @@
         </span>
       </section>
     </div>
+    <div id="rec" class="scr" aria-hidden="true"><i></i></div>
     <div id="ctl" class="scr">
       <button id="bPlay" type="button" aria-label="Pause ou reprise"><svg class="ii" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg><svg class="ip" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 L20 12 L7 20 Z"/></svg></button>
       <button id="bStop" type="button" aria-label="Terminer la séance"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></button>
