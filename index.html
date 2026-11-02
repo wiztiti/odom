@@ -250,7 +250,9 @@
   #menu .big{display:flex;flex-direction:column;align-items:flex-start;gap:.25em;text-align:left;background:none;border:1.5px solid var(--ride);border-radius:12px;padding:1.4vh 3.5vw}
   #menu .big b{color:var(--ride);font-size:1.08em}
   #menu .big span{opacity:.9;font-size:.92em}
-  #menu .card2{border:1px solid rgba(128,128,128,.45);border-radius:12px;padding:1.2vh 3.5vw}
+  #menu .card2{border:1.5px solid rgba(128,128,128,.45);border-radius:12px;padding:1.2vh 3.5vw}
+  #menu .card2.c-reg{border-color:var(--speed)}   /* Réglages : bleu */
+  #menu .card2.c-aide{border-color:var(--km)}     /* Aide : vert */
   #menu .set{display:flex;align-items:center;justify-content:space-between;gap:.8em;padding:.55em 0;border-top:1px solid rgba(128,128,128,.25)}
   #menu .set:first-of-type{border-top:0}
   #menu .set small{opacity:.7}
@@ -399,13 +401,13 @@
         <div class="mtop"><button id="menuBack" type="button">‹ Compteur</button><h2>Menu</h2><i></i></div>
         <button id="histoBtn" class="big" type="button"><b>Historique ›</b><span>Vos séances, jour par jour.</span></button>
 
-        <section class="card2">
+        <section class="card2 c-reg">
           <h3>Réglages</h3>
           <div class="set"><span>Mode plein soleil</span><button id="setSun" type="button"></button></div>
-          <div class="set"><span>Vitesse</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
+          <div class="set"><span>Précision de la vitesse</span><div class="seg3" data-act="bike"><button type="button" data-pr="d1">0,1</button><button type="button" data-pr="d2">0,2</button><button type="button" data-pr="plus">+</button><button type="button" data-pr="int">1</button></div></div>
         </section>
 
-        <section class="card2">
+        <section class="card2 c-aide">
           <h3>Aide</h3>
           <ul>
                         <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip : maintenir 1,5 s, la barre se remplit (relâcher avant la fin annule). ☀ : mode plein soleil (cadrans clairs).</span></li>
