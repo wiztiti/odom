@@ -395,7 +395,7 @@
         <section class="card2">
           <h3>Aide</h3>
           <ul>
-                        <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip : maintenir 2 s, la barre se remplit (relâcher avant la fin annule). ☀ : mode plein soleil (cadrans clairs).</span></li>
+                        <li><b class="c-speed">Boutons ▶ ■ ↺ ☀</b><span>▶ : démarre le comptage (trip, temps et séance) ; rien n'est compté avant. ⏸ : pause / reprise (reprise automatique au-dessus de 12 km/h). ■ : termine la séance, rangée dans l'historique, et arrête le comptage (le trip reste affiché). ↺ : remise à zéro du trip : maintenir 1,5 s, la barre se remplit (relâcher avant la fin annule). ☀ : mode plein soleil (cadrans clairs).</span></li>
             <li><b class="c-time">Heure ou cap</b><span>Toucher : mode plein soleil (cadrans clairs). Re-toucher pour revenir.</span></li>
           </ul>
         </section>
@@ -684,8 +684,8 @@
   applyUnit();
   if (sess && (sess.u === 'nm') !== (act === 'boat')) closeSess();   // séance restée ouverte d'une autre activité
 
-  /* ---------- Remise à zéro : maintenir ↺ pendant 2 s, une barre se remplit sur le bloc trip ---------- */
-  var HOLD_MS = 2000;       // durée du maintien
+  /* ---------- Remise à zéro : maintenir ↺ pendant 1,5 s, une barre se remplit sur le bloc trip ---------- */
+  var HOLD_MS = 1500;       // durée du maintien
   var HOLD_SHOW_MS = 250;   // la barre n'apparaît qu'après ce délai
   var elReset = document.getElementById('bReset'), elHold = document.getElementById('hold'), elHoldFill = document.getElementById('holdFill');
   var holdOn = false, holdT0 = 0, holdRaf = 0;
